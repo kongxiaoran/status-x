@@ -4,45 +4,89 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"net"
-	"net/http"
-	"os"
-	"time"
-
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/mem"
+	gonet "github.com/shirou/gopsutil/net"
+	"math"
+	"net"
+	"net/http"
+	"os"
+	"strconv"
+	"time"
 )
 
 // 主机监控数据结构
 type HostData struct {
-	Hostname     string  `json:"hostname"`
-	IP           string  `json:"ip"`
-	CPUUsage     float64 `json:"cpu_usage"`
-	MemoryUsage  float64 `json:"memory_usage"`
-	DiskUsage    float64 `json:"disk_usage"`
-	NetworkUsage float64 `json:"network_usage"`
-	Timestamp    int64   `json:"timestamp"`
+	Hostname    string  `json:"hostname"`
+	IP          string  `json:"ip"`
+	CPUUsage    float64 `json:"cpu_usage"`
+	MemoryUsage float64 `json:"memory_usage"`
+	DiskUsage   float64 `json:"disk_usage"`
+	NetworkIO   float64 `json:"network_io"`       // MB
+	ReadWriteIO float64 `json:"read_write_io_io"` // MB
+	ConnCount   int     `json:"conn_count"`       // 网络连接数
+	Timestamp   int64   `json:"timestamp"`
 }
 
 var IpAdress = ""
 var InfluxURL = "10.10.18.116:8086"
-var ServerURL = "localhost:8080"
+var ServerURL = "localhost:12800"
+var CollectFrequency = 1
+
+// name:admin pass:adminadmin
 var InfluxToken = "wh56EgkTNCyt-oSz_4Uo8l_SYy9R57CnUFy2NZY4bxmjZ9bbBNiMvQ0kdo8W4cwdvP6JrgXY49uXpTI7d5mRtA=="
 
-// 获取监控数据
+var latestReadAndWriteIO = 0.0
+var latestNetIO = 0.0
+
 func getHostData() (HostData, error) {
 	cpuUsage, _ := cpu.Percent(0, false)
 	memStat, _ := mem.VirtualMemory()
 	diskStat, _ := disk.Usage("/")
-	ipAddress := IpAdress
+	netIOCounters, _ := gonet.IOCounters(false)
+	connStats, _ := gonet.Connections("all")
+
+	// 计算网络 I/O
+	var totalNetworkIO float64
+	for _, stat := range netIOCounters {
+		totalNetworkIO += float64(stat.BytesSent + stat.BytesRecv)
+	}
+
+	netWorkIO := totalNetworkIO - latestNetIO
+	latestNetIO = totalNetworkIO
+
+	// 将字节转换为 MB
+	netWorkIO /= 1024 * 1024 // 转换为 MB
+	netWorkIO = round(netWorkIO, 2)
+
+	// 获取读写 I/O（假设你要获取的为 disk I/O）
+	diskReadWriteIO, _ := disk.IOCounters()
+	var totalReadAndWriteIO float64
+	for _, stat := range diskReadWriteIO {
+		totalReadAndWriteIO += float64(stat.ReadBytes + stat.WriteBytes)
+	}
+
+	readAndWriteIO := totalReadAndWriteIO - latestReadAndWriteIO
+	latestReadAndWriteIO = totalReadAndWriteIO
+
+	readAndWriteIO /= 1024 * 1024 // 转换为 MB
+	readAndWriteIO = round(readAndWriteIO, 2)
 
 	return HostData{
-		IP:          ipAddress, // 可以使用函数获取真实 IP
+		IP:          IpAdress,
 		CPUUsage:    cpuUsage[0],
 		MemoryUsage: memStat.UsedPercent,
 		DiskUsage:   diskStat.UsedPercent,
+		NetworkIO:   netWorkIO,
+		ReadWriteIO: readAndWriteIO,
+		ConnCount:   len(connStats),
 	}, nil
+}
+
+func round(value float64, precision int) float64 {
+	pow := math.Pow(10, float64(precision))
+	return math.Round(value*pow) / pow
 }
 
 // 将监控数据发送到 InfluxDB
@@ -97,10 +141,35 @@ func init() {
 	if serverURLEnv := os.Getenv("SERVER_URL"); serverURLEnv != "" {
 		ServerURL = serverURLEnv
 	}
+	if collectFrequencyEnv := os.Getenv("COLLECT_FREQUENCY"); collectFrequencyEnv != "" {
+		tempEnv, err := strconv.Atoi(collectFrequencyEnv)
+		if err != nil {
+			fmt.Println("COLLECT_FREQUENCY 转换错误:", err)
+			return
+		}
+		CollectFrequency = tempEnv
+	}
 }
 
 func main() {
 	IpAdress, _ = getIPv4Address()
+
+	diskReadWriteIO, _ := disk.IOCounters()
+	var totalReadAndWriteIO float64
+	for _, stat := range diskReadWriteIO {
+		totalReadAndWriteIO += float64(stat.ReadBytes)
+		totalReadAndWriteIO += float64(stat.WriteBytes)
+	}
+	latestReadAndWriteIO = totalReadAndWriteIO
+
+	// 计算网络 I/O
+	var totalNetworkIO float64
+	netIOCounters, _ := gonet.IOCounters(false)
+	for _, stat := range netIOCounters {
+		totalNetworkIO += float64(stat.BytesSent + stat.BytesRecv)
+	}
+	latestNetIO = totalNetworkIO
+
 	for {
 		hostData, err := getHostData()
 		if err != nil {
@@ -114,7 +183,7 @@ func main() {
 		// 将数据发送到服务端
 		sendDataToServer(hostData)
 
-		time.Sleep(1 * time.Second) // 每 10 秒采集一次数据
+		time.Sleep(time.Duration(CollectFrequency) * time.Second) // 每 CollectFrequency 秒采集一次数据
 	}
 }
 

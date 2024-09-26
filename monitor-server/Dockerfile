@@ -1,5 +1,5 @@
 # 使用官方的 Golang 镜像作为基础镜像，使用较小的 Alpine 版本
-FROM golang:1.21-alpine AS builder
+FROM golang:1.22-alpine AS builder
 
 # 设置 Go 模块代理为国内代理
 ENV GOPROXY=https://goproxy.cn,direct
