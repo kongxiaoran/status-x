@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中台服务器监控</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            display: flex;
+        }
+
+        .sidebar {
+            width: 200px;
+            background-color: #333;
+            color: #fff;
+            padding: 20px;
+            height: 100vh;
+        }
+
+        .sidebar h2 {
+            font-size: 18px;
+            margin: 0 0 20px;
+        }
+
+        .sidebar a {
+            color: #fff;
+            text-decoration: none;
+            display: block;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+
+        .sidebar a:hover {
+            background-color: #444;
+        }
+
+        .container {
+            flex: 1;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 32px;
+        }
+
+        .sort-container {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            margin-bottom: 10px;
+        }
+
+        select {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            font-size: 16px;
+            margin-left: 10px;
+        }
+
+        #hosts {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: space-between;
+        }
+
+        .host-box {
+            background: linear-gradient(135deg, #f7f7f7, #e3f2fd);
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            width: calc(25% - 20px);
+            box-sizing: border-box;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .host-box:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .host-box h2 {
+            font-size: 20px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .metrics {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .metric {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .progress-bar {
+            height: 8px;
+            flex: 0.5;
+            border-radius: 5px;
+            background-color: #e0e0e0;
+            position: relative;
+            margin-right: 10px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 0.3s ease;
+        }
+
+        .progress-cpu {
+            background: linear-gradient(90deg, #ffecb3, #ff9800);
+        }
+
+        .progress-memory {
+            background: linear-gradient(90deg, #c5e1a5, #8bc34a);
+        }
+
+        .progress-disk {
+            background: linear-gradient(90deg, #f48fb1, #e91e63);
+        }
+
+        @media (max-width: 1200px) {
+            .host-box {
+                width: calc(33.33% - 20px);
+            }
+        }
+
+        @media (max-width: 900px) {
+            .host-box {
+                width: calc(50% - 20px);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .host-box {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="sidebar">
+    <h2>导航</h2>
+    <a href="#" onclick="navigateTo('dashboard')">仪表板</a>
+    <a href="#" onclick="navigateTo('alert-config')">警报配置</a>
+    <a href="#" onclick="navigateTo('pod-metrics')">Pod监测</a>
+</div>
+<div class="container">
+    <h1>中台服务器 监控仪表板</h1>
+    <div class="sort-container">
+        <label for="sort">排序依据:</label>
+        <select id="sort" onchange="loadHostData()">
+            <option value="ip">按 IP 排序</option>
+            <option value="cpu">按 CPU 占用排序</option>
+            <option value="memory">按 内存 占用排序</option>
+            <option value="disk">按 磁盘 占用排序</option>
+        </select>
+    </div>
+    <div id="hosts"></div>
+</div>
+
+<script>
+    let sortOrder = 'ip';
+
+    function navigateTo(page) {
+        if (page === 'alert-config') {
+            window.location.href = 'alert-config.html'; // 更新为警报配置页面
+        } else if (page === 'dashboard') {
+            window.location.href = 'index.html'; // 返回仪表板
+        } else if (page === 'pod-metrics'){
+            window.location.href = 'pod-metrics.html'
+        }else {
+            alert('其他页面尚未实现');
+        }
+
+    }
+
+    function loadHostData() {
+        fetch('/api/dashboard')
+            .then(response => response.json())
+            .then(data => {
+                data.sort((a, b) => {
+                    if (sortOrder === 'cpu') {
+                        return b.cpu_usage - a.cpu_usage;
+                    } else if (sortOrder === 'memory') {
+                        return b.memory_usage - a.memory_usage;
+                    } else if (sortOrder === 'disk') {
+                        return b.disk_usage - a.disk_usage;
+                    } else {
+                        return a.ip.localeCompare(b.ip);
+                    }
+                });
+
+                const hostContainer = document.getElementById('hosts');
+                hostContainer.innerHTML = '';
+
+                data.forEach(host => {
+                    const hostDiv = document.createElement('div');
+                    hostDiv.className = 'host-box';
+                    hostDiv.onclick = function () {
+                        window.location.href = `host-metrics.html?host=${host.ip}`;
+                    };
+
+                    const cpuColor = host.cpu_usage > 90 ? 'red' : 'green';
+                    const memoryColor = host.memory_usage > 90 ? 'red' : 'green';
+                    const diskColor = host.disk_usage > 85 ? 'red' : 'green';
+
+                    hostDiv.innerHTML = `
+                            <h2>主机: ${host.ip}</h2>
+                            <div class="metrics">
+                                <div class="metric">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill progress-cpu" style="width: ${host.cpu_usage}%; background-color: ${cpuColor};"></div>
+                                    </div>
+                                    <span style="color: ${cpuColor};">CPU 使用率: ${host.cpu_usage.toFixed(2)}%</span>
+                                </div>
+                                <div class="metric">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill progress-memory" style="width: ${host.memory_usage}%; background-color: ${memoryColor};"></div>
+                                    </div>
+                                    <span style="color: ${memoryColor};">内存 使用率: ${host.memory_usage.toFixed(2)}%</span>
+                                </div>
+                                <div class="metric">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill progress-disk" style="width: ${host.disk_usage}%; background-color: ${diskColor};"></div>
+                                    </div>
+                                    <span style="color: ${diskColor};">磁盘 使用率: ${host.disk_usage.toFixed(2)}%</span>
+                                </div>
+                            </div>
+                        `;
+
+                    hostContainer.appendChild(hostDiv);
+                });
+            });
+    }
+
+    document.getElementById('sort').addEventListener('change', function() {
+        sortOrder = this.value;
+        loadHostData();
+    });
+
+    setInterval(loadHostData, 1000);
+</script>
+</body>
+</html>

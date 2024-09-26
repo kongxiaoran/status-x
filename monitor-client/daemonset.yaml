@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: go-monitor
+  namespace: kube-system  # 可以将其部署到 kube-system 命名空间中
+spec:
+  selector:
+    matchLabels:
+      app: go-monitor
+  template:
+    metadata:
+      labels:
+        app: go-monitor
+    spec:
+      containers:
+        - name: go-monitor
+          image: my-go-monitor:latest  # 替换为你构建的镜像名称
+          env:
+            - name: INFLUX_TOKEN
+              value: "wh56EgkTNCyt-oSz_4Uo8l_SYy9R57CnUFy2NZY4bxmjZ9bbBNiMvQ0kdo8W4cwdvP6JrgXY49uXpTI7d5mRtA=="
+            - name: INFLUX_URL
+              value: "http://10.10.18.116:8086"  # 在这里替换为实际的 InfluxDB 地址
+            - name: SERVER_URL
+              value: "http://localhost:8080"    # 在这里替换为实际的服务器地址
+          resources:
+            limits:
+              memory: "200Mi"
+              cpu: "500m"
+            requests:
+              memory: "100Mi"
+              cpu: "250m"
+      restartPolicy: Always
