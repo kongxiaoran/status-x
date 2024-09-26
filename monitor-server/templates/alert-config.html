@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>警报配置</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            display: flex;
+        }
+        .sidebar {
+            width: 200px;
+            background-color: #333;
+            color: #fff;
+            padding: 20px;
+            height: 100vh;
+        }
+        .sidebar h2 {
+            font-size: 18px;
+            margin: 0 0 20px;
+        }
+        .sidebar a {
+            color: #fff;
+            text-decoration: none;
+            display: block;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+        .sidebar a:hover {
+            background-color: #444;
+        }
+        .container {
+            flex: 1;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 32px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+    </style>
+</head>
+<body>
+<div class="sidebar">
+    <h2>导航</h2>
+    <a href="index.html">仪表板</a>
+    <a href="alert-config.html">警报配置</a>
+    <a href="pod-metrics.html">Pod监测</a>
+</div>
+<div class="container">
+    <h1>警报配置</h1>
+    <div class="form-group">
+        <label for="cpu-threshold">CPU 使用率阈值 (%)</label>
+        <input type="number" id="cpu-threshold" placeholder="输入 CPU 阈值" min="0" max="100">
+    </div>
+    <div class="form-group">
+        <label for="cpu-duration">CPU 占用持续时间 (分钟)</label>
+        <input type="number" id="cpu-duration" placeholder="输入 CPU 持续时间" min="0">
+    </div>
+    <div class="form-group">
+        <label for="memory-threshold">内存使用率阈值 (%)</label>
+        <input type="number" id="memory-threshold" placeholder="输入内存阈值" min="0" max="100">
+    </div>
+    <div class="form-group">
+        <label for="memory-duration">内存占用持续时间 (分钟)</label>
+        <input type="number" id="memory-duration" placeholder="输入内存持续时间" min="0">
+    </div>
+    <div class="form-group">
+        <label for="disk-threshold">磁盘使用率阈值 (%)</label>
+        <input type="number" id="disk-threshold" placeholder="输入磁盘阈值" min="0" max="100">
+    </div>
+    <button onclick="updateAlertConfig()">更新配置</button>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        fetch('/api/alert-metrics')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('cpu-threshold').value = data.cpu_threshold;
+                    document.getElementById('cpu-duration').value = data.cpu_duration;
+                    document.getElementById('memory-threshold').value = data.memory_threshold;
+                    document.getElementById('memory-duration').value = data.memory_duration;
+                    document.getElementById('disk-threshold').value = data.disk_threshold;
+                } else {
+                    alert('获取配置失败: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('请求失败:', error);
+                alert('获取配置过程中出现错误。');
+            });
+    });
+
+    function updateAlertConfig() {
+        const cpuThreshold = parseFloat(document.getElementById('cpu-threshold').value);
+        const cpuDuration = parseFloat(document.getElementById('cpu-duration').value); // 这里假设输入的是分钟
+        const memoryThreshold = parseFloat(document.getElementById('memory-threshold').value);
+        const memoryDuration = parseFloat(document.getElementById('memory-duration').value); // 这里假设输入的是分钟
+        const diskThreshold = parseFloat(document.getElementById('disk-threshold').value);
+
+        const data = {
+            cpu_threshold: cpuThreshold,
+            cpu_duration: cpuDuration,
+            memory_threshold: memoryThreshold,
+            memory_duration: memoryDuration,
+            disk_threshold: diskThreshold
+        };
+
+        fetch('/api/alert-config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data),
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('警报配置更新成功！');
+                } else {
+                    alert('更新失败: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('请求失败:', error);
+                alert('更新过程中出现错误。');
+            });
+    }
+</script>
+</body>
+</html>
