@@ -9,7 +9,6 @@ import (
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
 	"log"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 )
@@ -57,9 +56,6 @@ func getPodMetrics(clientset *kubernetes.Clientset, metricsClientset *metricscli
 			}
 			for _, pod := range pods.Items {
 				fmt.Println(pod.Namespace, "  ", pod.Name)
-				if strings.Contains(pod.Name, "finchina-discovery-c968f66f9-wsqrr") {
-					fmt.Println(1)
-				}
 				node, err := clientset.CoreV1().Nodes().Get(context.TODO(), pod.Spec.NodeName, metav1.GetOptions{})
 				nodeIP := ""
 				if err == nil {

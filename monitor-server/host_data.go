@@ -10,17 +10,17 @@ import (
 )
 
 type HostData struct {
-	Hostname    string  `json:"hostname"`
-	IP          string  `json:"ip"`
-	NodeIP      string  `json:"node_ip"`
-	NameSpace   string  `json:"name_space"`
-	CPUUsage    float64 `json:"cpu_usage"`
-	MemoryUsage float64 `json:"memory_usage"`
-	DiskUsage   float64 `json:"disk_usage"`
-	NetworkIO   float64 `json:"network_io"`
-	ReadWriteIO float64 `json:"read_write_io"`
-	NetConn     int     `json:"net_conn"`
-	Timestamp   int64   `json:"timestamp"`
+	Hostname     string  `json:"hostname"`
+	IP           string  `json:"ip"`
+	NodeIP       string  `json:"node_ip"`
+	NameSpace    string  `json:"name_space"`
+	CPUUsage     float64 `json:"cpu_usage"`
+	MemoryUsage  float64 `json:"memory_usage"`
+	DiskUsage    float64 `json:"disk_usage"`
+	NetworkIO    float64 `json:"network_io"`
+	ReadWriteIO  float64 `json:"read_write_io"`
+	NetConnCount int     `json:"net_conn_count"` // 网络连接数
+	Timestamp    int64   `json:"timestamp"`
 }
 
 var dataStore = make(map[string]HostData)

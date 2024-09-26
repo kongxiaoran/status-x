@@ -18,15 +18,15 @@ import (
 
 // 主机监控数据结构
 type HostData struct {
-	Hostname    string  `json:"hostname"`
-	IP          string  `json:"ip"`
-	CPUUsage    float64 `json:"cpu_usage"`
-	MemoryUsage float64 `json:"memory_usage"`
-	DiskUsage   float64 `json:"disk_usage"`
-	NetworkIO   float64 `json:"network_io"`       // MB
-	ReadWriteIO float64 `json:"read_write_io_io"` // MB
-	ConnCount   int     `json:"conn_count"`       // 网络连接数
-	Timestamp   int64   `json:"timestamp"`
+	Hostname     string  `json:"hostname"`
+	IP           string  `json:"ip"`
+	CPUUsage     float64 `json:"cpu_usage"`
+	MemoryUsage  float64 `json:"memory_usage"`
+	DiskUsage    float64 `json:"disk_usage"`
+	NetworkIO    float64 `json:"network_io"`     // MB
+	ReadWriteIO  float64 `json:"read_write_io"`  // MB
+	NetConnCount int     `json:"net_conn_count"` // 网络连接数
+	Timestamp    int64   `json:"timestamp"`
 }
 
 var IpAdress = ""
@@ -74,13 +74,13 @@ func getHostData() (HostData, error) {
 	readAndWriteIO = round(readAndWriteIO, 2)
 
 	return HostData{
-		IP:          IpAdress,
-		CPUUsage:    cpuUsage[0],
-		MemoryUsage: memStat.UsedPercent,
-		DiskUsage:   diskStat.UsedPercent,
-		NetworkIO:   netWorkIO,
-		ReadWriteIO: readAndWriteIO,
-		ConnCount:   len(connStats),
+		IP:           IpAdress,
+		CPUUsage:     cpuUsage[0],
+		MemoryUsage:  memStat.UsedPercent,
+		DiskUsage:    diskStat.UsedPercent,
+		NetworkIO:    netWorkIO,
+		ReadWriteIO:  readAndWriteIO,
+		NetConnCount: len(connStats),
 	}, nil
 }
 
@@ -104,13 +104,16 @@ func sendDataToInfluxDB(data HostData) {
 	req.Header.Set("Authorization", "Token "+InfluxToken) // 使用 Token 进行认证
 	req.Header.Set("Content-Type", "text/plain")          // InfluxDB 2.x 使用 "text/plain" 类型
 	client := &http.Client{}
+	//增加请求延迟打印延迟
+	now := time.Now()
 	resp, err := client.Do(req)
+	cost := time.Since(now).Milliseconds()
 	if err != nil {
 		fmt.Println("Error sending data to InfluxDB:", err)
 		return
 	}
 	defer resp.Body.Close()
-	fmt.Println("Data sent to InfluxDB, response status:", resp.Status)
+	fmt.Println("Data sent to InfluxDB, response status: ", resp.Status, " cost:", cost, "ms")
 }
 
 // 将监控数据发送到服务端
@@ -120,14 +123,15 @@ func sendDataToServer(data HostData) {
 		fmt.Println("Error marshaling host data:", err)
 		return
 	}
-
+	now := time.Now()
 	resp, err := http.Post("http://"+ServerURL+"/api/host-data", "application/json", bytes.NewBuffer(jsonData))
+	cost := time.Since(now).Milliseconds()
 	if err != nil {
 		fmt.Println("Error sending data to server:", err)
 		return
 	}
 	defer resp.Body.Close()
-	fmt.Println("Data sent to server, response status:", resp.Status)
+	fmt.Println("Data sent to server, response status:", resp.Status, " cost:", cost, "ms")
 }
 
 // 初始化，加载环境变量
