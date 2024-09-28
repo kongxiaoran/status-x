@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -42,6 +43,25 @@ func main() {
 				writePodMetricsToInflux(podMetrics)
 			}
 			time.Sleep(5 * time.Second) // 每2 获取一次数据
+		}
+	}()
+
+	hostData := HostData{
+		Hostname: "test",
+		IP:       "localhost",
+	}
+
+	podMetricsList = append(podMetricsList, hostData)
+
+	go func() {
+		for {
+			if podMetricsList != nil {
+				for _, pod := range podMetricsList {
+					actuator := getPodActuator(pod.IP)
+					fmt.Print(actuator)
+				}
+			}
+			time.Sleep(2 * time.Second) // 每2 获取一次数据
 		}
 	}()
 
