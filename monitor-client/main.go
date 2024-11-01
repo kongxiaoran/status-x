@@ -8,6 +8,7 @@ import (
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/mem"
 	gonet "github.com/shirou/gopsutil/net"
+	"log"
 	"math"
 	"net"
 	"net/http"
@@ -33,6 +34,7 @@ var IpAdress = ""
 var InfluxURL = "10.10.18.116:8086"
 var ServerURL = "localhost:12800"
 var CollectFrequency = 1
+var MonitorDiskPath = "/"
 
 // name:admin pass:adminadmin
 var InfluxToken = "wh56EgkTNCyt-oSz_4Uo8l_SYy9R57CnUFy2NZY4bxmjZ9bbBNiMvQ0kdo8W4cwdvP6JrgXY49uXpTI7d5mRtA=="
@@ -43,7 +45,26 @@ var latestNetIO = 0.0
 func getHostData() (HostData, error) {
 	cpuUsage, _ := cpu.Percent(0, false)
 	memStat, _ := mem.VirtualMemory()
-	diskStat, _ := disk.Usage("/")
+
+	diskUsage := 0.0
+	if MonitorDiskPath == "all" {
+		partitions, _ := disk.Partitions(false)
+		var totalSpace, totalUsed uint64
+		for _, partition := range partitions {
+			usage, err := disk.Usage(partition.Mountpoint)
+			if err == nil {
+				totalSpace += usage.Total
+				totalUsed += usage.Used
+			}
+		}
+		if totalSpace > 0 {
+			diskUsage = (float64(totalUsed) / float64(totalSpace)) * 100
+		}
+	} else {
+		diskStat, _ := disk.Usage(MonitorDiskPath)
+		diskUsage = diskStat.UsedPercent
+	}
+
 	netIOCounters, _ := gonet.IOCounters(false)
 	connStats, _ := gonet.Connections("all")
 
@@ -77,7 +98,7 @@ func getHostData() (HostData, error) {
 		IP:           IpAdress,
 		CPUUsage:     cpuUsage[0],
 		MemoryUsage:  memStat.UsedPercent,
-		DiskUsage:    diskStat.UsedPercent,
+		DiskUsage:    diskUsage,
 		NetworkIO:    netWorkIO,
 		ReadWriteIO:  readAndWriteIO,
 		NetConnCount: len(connStats),
@@ -105,15 +126,15 @@ func sendDataToInfluxDB(data HostData) {
 	req.Header.Set("Content-Type", "text/plain")          // InfluxDB 2.x 使用 "text/plain" 类型
 	client := &http.Client{}
 	//增加请求延迟打印延迟
-	now := time.Now()
+	//now := time.Now()
 	resp, err := client.Do(req)
-	cost := time.Since(now).Milliseconds()
+	//cost := time.Since(now).Milliseconds()
 	if err != nil {
 		fmt.Println("Error sending data to InfluxDB:", err)
 		return
 	}
 	defer resp.Body.Close()
-	fmt.Println("Data sent to InfluxDB, response status: ", resp.Status, " cost:", cost, "ms")
+	//fmt.Println("Data sent to InfluxDB, response status: ", resp.Status, " cost:", cost, "ms")
 }
 
 // 将监控数据发送到服务端
@@ -123,27 +144,35 @@ func sendDataToServer(data HostData) {
 		fmt.Println("Error marshaling host data:", err)
 		return
 	}
-	now := time.Now()
+	//now := time.Now()
 	resp, err := http.Post("http://"+ServerURL+"/api/host-data", "application/json", bytes.NewBuffer(jsonData))
-	cost := time.Since(now).Milliseconds()
+	//cost := time.Since(now).Milliseconds()
 	if err != nil {
 		fmt.Println("Error sending data to server:", err)
 		return
 	}
 	defer resp.Body.Close()
-	fmt.Println("Data sent to server, response status:", resp.Status, " cost:", cost, "ms")
+	//fmt.Println("Data sent to server, response status:", resp.Status, " cost:", cost, "ms")
 }
 
 // 初始化，加载环境变量
 func init() {
 	if influxTokenEnv := os.Getenv("INFLUX_TOKEN"); influxTokenEnv != "" {
 		InfluxToken = influxTokenEnv
+		log.Println("加载 INFLUX_TOKEN=" + InfluxToken)
 	}
 	if influxURLEnv := os.Getenv("INFLUX_URL"); influxURLEnv != "" {
 		InfluxURL = influxURLEnv
+		log.Println("加载 INFLUX_URL=" + InfluxURL)
 	}
 	if serverURLEnv := os.Getenv("SERVER_URL"); serverURLEnv != "" {
 		ServerURL = serverURLEnv
+		log.Println("加载 SERVER_URL=" + ServerURL)
+	}
+
+	if monitorDiskPath := os.Getenv("MONITOR_DISK_PATH"); monitorDiskPath != "" {
+		MonitorDiskPath = monitorDiskPath
+		log.Println("加载 MONITOR_DISK_PATH=" + MonitorDiskPath)
 	}
 	if collectFrequencyEnv := os.Getenv("COLLECT_FREQUENCY"); collectFrequencyEnv != "" {
 		tempEnv, err := strconv.Atoi(collectFrequencyEnv)

@@ -54,7 +54,7 @@
             font-weight: bold;
         }
         input[type="text"] {
-            width: 100%;
+            width: 20%;
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 5px;
@@ -110,7 +110,10 @@
     <h2>导航</h2>
     <a href="index.html">仪表板</a>
     <a href="alert-config.html">警报配置</a>
-    <a href="host-management.html">主机管理</a>
+    <a href="pod-metrics.html">Pod监测</a>
+    <!--    <a href="#" onclick="navigateTo('actuator')">服务内部监控</a>-->
+    <a href="host-manager.html">主机管理</a>
+    <a href="http://10.15.97.110:21120/html/">X-Flood压测</a>
 </div>
 <div class="container">
     <h1>主机管理</h1>
@@ -119,8 +122,12 @@
         <input type="text" id="host-ip" placeholder="输入主机 IP 地址">
     </div>
     <div class="form-group">
+        <label for="host-label">标签</label>
+        <input type="text" id="host-label" placeholder="输入主机标签">
+    </div>
+    <div class="form-group">
         <label for="alert-enabled">开启预警</label>
-        <input type="checkbox" id="alert-enabled">
+        <input type="checkbox" id="alert-enabled" checked>
     </div>
     <button onclick="addHost()">添加主机</button>
 
@@ -128,6 +135,7 @@
         <thead>
         <tr>
             <th>IP 地址</th>
+            <td>主机标签</td>
             <th>是否开启预警</th>
             <th>操作</th>
         </tr>
@@ -152,6 +160,7 @@
                         const row = document.createElement('tr');
                         row.innerHTML = `
                             <td>${host.ip_address}</td>
+                            <td>${host.label}</td>
                             <td>
                                 <input type="checkbox" ${host.alert_enabled ? 'checked' : ''}
                                     onchange="toggleAlert('${host.ip_address}', this.checked)">
@@ -172,6 +181,7 @@
 
     function addHost() {
         const ipAddress = document.getElementById('host-ip').value;
+        const label = document.getElementById('host-label').value;
         const alertEnabled = document.getElementById('alert-enabled').checked;
 
         if (!ipAddress) {
@@ -181,7 +191,8 @@
 
         const data = {
             ip_address: ipAddress,
-            alert_enabled: alertEnabled
+            alert_enabled: alertEnabled,
+            label:label
         };
 
         fetch('/api/host-management', {

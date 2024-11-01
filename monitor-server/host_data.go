@@ -10,17 +10,19 @@ import (
 )
 
 type HostData struct {
-	Hostname     string  `json:"hostname"`
-	IP           string  `json:"ip"`
-	NodeIP       string  `json:"node_ip"`
-	NameSpace    string  `json:"name_space"`
-	CPUUsage     float64 `json:"cpu_usage"`
-	MemoryUsage  float64 `json:"memory_usage"`
-	DiskUsage    float64 `json:"disk_usage"`
-	NetworkIO    float64 `json:"network_io"`
-	ReadWriteIO  float64 `json:"read_write_io"`
-	NetConnCount int     `json:"net_conn_count"` // 网络连接数
-	Timestamp    int64   `json:"timestamp"`
+	Hostname        string  `json:"hostname"`
+	IP              string  `json:"ip"`
+	NodeIP          string  `json:"node_ip"`
+	Label           string  `json:"label"`
+	NameSpace       string  `json:"name_space"`
+	CPUUsage        float64 `json:"cpu_usage"`
+	MemoryUsage     float64 `json:"memory_usage"`
+	DiskUsage       float64 `json:"disk_usage"`
+	NetworkIO       float64 `json:"network_io"`
+	ReadWriteIO     float64 `json:"read_write_io"`
+	NetConnCount    int     `json:"net_conn_count"` // 网络连接数
+	Timestamp       int64   `json:"timestamp"`
+	ActuatorMetrics map[string]interface{}
 }
 
 var dataStore = make(map[string]HostData)
@@ -55,6 +57,7 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 
 	var hosts []HostData
 	for _, hostData := range dataStore {
+		hostData.Label = HostManage[hostData.IP].Label
 		hosts = append(hosts, hostData)
 	}
 
@@ -69,6 +72,22 @@ func handlePodDashboard(w http.ResponseWriter, r *http.Request) {
 
 	var filteredList []HostData
 	for _, item := range podMetricsList {
+		if (nodeIP == "" || strings.Contains(item.NodeIP, nodeIP)) &&
+			(nameSpace == "" || strings.Contains(item.NameSpace, nameSpace)) {
+			filteredList = append(filteredList, item)
+		}
+	}
+	json.NewEncoder(w).Encode(filteredList)
+}
+
+func handleActuatorDashboard(w http.ResponseWriter, r *http.Request) {
+
+	// 解析请求参数
+	nodeIP := r.URL.Query().Get("host_ip")
+	nameSpace := r.URL.Query().Get("namespace")
+
+	var filteredList []HostData
+	for _, item := range actuatorList {
 		if (nodeIP == "" || strings.Contains(item.NodeIP, nodeIP)) &&
 			(nameSpace == "" || strings.Contains(item.NameSpace, nameSpace)) {
 			filteredList = append(filteredList, item)

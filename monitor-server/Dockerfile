@@ -27,6 +27,7 @@ COPY --from=builder /app/main /app
 
 # 复制前端模板文件
 COPY --from=builder /app/templates /app/templates
+COPY --from=builder /app/resources /app/resources
 
 #复制配置文件
 COPY --from=builder /app/kubeconfig.yaml /app/kubeconfig.yaml

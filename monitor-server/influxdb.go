@@ -71,6 +71,31 @@ func writePodMetricsToInflux(podMetrics []HostData) {
 		}
 	}
 }
+
+func writeApplicationMetricsToInflux(actuatorMetrics []HostData) {
+
+	if actuatorList == nil {
+		return
+	}
+	client := influxdb2.NewClient("http://"+InfluxURL, InfluxToken)
+	defer client.Close()
+
+	writeAPI := client.WriteAPIBlocking(Org, Bucket)
+
+	for _, host := range actuatorMetrics {
+		p := influxdb2.NewPointWithMeasurement("actuator_metrics").
+			AddTag("pod", host.Hostname).
+			AddField("jvm_memory_used", host.ActuatorMetrics["jvm_memory_used_VALUE"]).
+			AddField("jvm_threads_daemon", host.ActuatorMetrics["jvm_threads_daemon_VALUE"]).
+			SetTime(time.Unix(host.Timestamp, 0))
+
+		err := writeAPI.WritePoint(context.Background(), p)
+		if err != nil {
+			fmt.Println("Error writing to InfluxDB:", err)
+		}
+	}
+}
+
 func queryPodMetricsFromInflux(podName, start, end string) ([]map[string]interface{}, error) {
 	client := influxdb2.NewClient("http://"+InfluxURL, InfluxToken)
 	defer client.Close()

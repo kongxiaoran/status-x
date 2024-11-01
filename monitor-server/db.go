@@ -12,10 +12,10 @@ import (
 
 var db *sql.DB
 
-var MYSQL_HOST = "10.10.18.116"
-var MYSQL_PORT = 13306
-var MYSQL_USER = "root"
-var MYSQL_PASS = "11111111"
+var MYSQL_HOST = "10.15.97.43"
+var MYSQL_PORT = 3306
+var MYSQL_USER = "app"
+var MYSQL_PASS = "app"
 var dsn = ""
 var dsnWithDB = ""
 
@@ -30,7 +30,7 @@ func initDB() {
 	}
 
 	// 检查指定数据库是否存在
-	dbName := "status_x"
+	dbName := "test"
 	if !checkDatabaseExists(dbName) {
 		// 如果数据库不存在，创建数据库
 		err = createDatabase(dbName)

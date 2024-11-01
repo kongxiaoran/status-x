@@ -14,6 +14,7 @@ import (
 )
 
 var podMetricsList []HostData
+var podMetricsListMu sync.Mutex
 
 func handlePodMetrics(w http.ResponseWriter, r *http.Request) {
 	podName := r.URL.Query().Get("pod")

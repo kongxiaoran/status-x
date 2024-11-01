@@ -5,9 +5,14 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"time"
 
 	"encoding/json"
 )
+
+var httpClient = &http.Client{
+	Timeout: time.Second * 5, // 设置超时时间为 5 秒
+}
 
 // MetricMap 用于表示整个 JSON 数据
 type MetricMap map[string][]StatisticData
@@ -18,11 +23,14 @@ type StatisticData struct {
 	Value     float64 `json:"value"`
 }
 
+var actuatorList []HostData
+
 func getPodActuator(address string) map[string]interface{} {
 
-	url := fmt.Sprintf("http://%s:8081/actuator/batch-metrics", address)
+	url := fmt.Sprintf("http://%s:8000/actuator/batch-metrics", address)
+	url = "http://10.10.18.246:19458/actuator/batch-metrics"
 	// 发送 HTTP 请求获取指标数据
-	resp, err := http.Get(url)
+	resp, err := httpClient.Get(url)
 	if err != nil {
 		fmt.Printf("Error fetching metrics: %v\n", err)
 		return nil

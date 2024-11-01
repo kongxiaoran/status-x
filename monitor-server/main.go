@@ -5,8 +5,13 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 )
+
+var PodCollectFrequency = 3
+var ActuatorFrequency = 2
 
 func init() {
 	if influxTokenEnv := os.Getenv("INFLUX_TOKEN"); influxTokenEnv != "" {
@@ -21,15 +26,32 @@ func init() {
 	if influxBucketEnv := os.Getenv("INFLUX_BUCKET"); influxBucketEnv != "" {
 		Bucket = influxBucketEnv
 	}
+	if podCollectFrequency := os.Getenv("POD_COLLECT_FREQUENCY"); podCollectFrequency != "" {
+		tempEnv, err := strconv.Atoi(podCollectFrequency)
+		if err != nil {
+			fmt.Println("POD_COLLECT_FREQUENCY 转换错误:", err)
+			return
+		}
+		PodCollectFrequency = tempEnv
+	}
+
+	if actuatorFrequency := os.Getenv("ACTUATOR_FREQUENCY"); actuatorFrequency != "" {
+		tempEnv, err := strconv.Atoi(actuatorFrequency)
+		if err != nil {
+			fmt.Println("ACTUATOR_FREQUENCY 转换错误:", err)
+			return
+		}
+		ActuatorFrequency = tempEnv
+	}
 }
 func main() {
 
 	// 初始化 MySQL 数据库
-	//initDB()
+	initDB()
 	// 从数据库加载报警配置
-	//loadAlertConfigFromDB()
+	loadAlertConfigFromDB()
 	// 从数据库加载主机信息
-	//loadHostsFromDB()
+	loadHostsFromDB()
 
 	clientset, metricsClientset := initKubernetesClient()
 
@@ -37,37 +59,41 @@ func main() {
 	go func() {
 		for {
 			podMetrics, err := getPodMetrics(clientset, metricsClientset)
+			podMetricsListMu.Lock()
 			podMetricsList = podMetrics
+			podMetricsListMu.Unlock()
 
 			if err == nil {
 				writePodMetricsToInflux(podMetrics)
 			}
-			time.Sleep(5 * time.Second) // 每2 获取一次数据
+			time.Sleep(time.Duration(PodCollectFrequency) * time.Second) // 每 POD_COLLECT_FREQUENCY 秒 获取一次数据
 		}
 	}()
-
-	hostData := HostData{
-		Hostname: "test",
-		IP:       "localhost",
-	}
-
-	podMetricsList = append(podMetricsList, hostData)
 
 	go func() {
 		for {
 			if podMetricsList != nil {
+				var actuatorHostTemp []HostData
 				for _, pod := range podMetricsList {
-					actuator := getPodActuator(pod.IP)
-					fmt.Print(actuator)
+					if strings.Contains(pod.Hostname, "information") {
+						actuator := getPodActuator(pod.IP)
+						podMetricsListMu.Lock()
+						pod.ActuatorMetrics = actuator
+						actuatorHostTemp = append(actuatorHostTemp, pod)
+						podMetricsListMu.Unlock()
+					}
 				}
+				actuatorList = actuatorHostTemp
+				writeApplicationMetricsToInflux(actuatorList)
 			}
-			time.Sleep(2 * time.Second) // 每2 获取一次数据
+			time.Sleep(time.Duration(ActuatorFrequency) * time.Second) // 每 ActuatorFrequency 获取一次数据
 		}
 	}()
 
 	http.HandleFunc("/api/host-data", handleHostData)
 	http.HandleFunc("/api/dashboard", handleDashboard)
 	http.HandleFunc("/api/pod-dashboard", handlePodDashboard)
+	http.HandleFunc("/api/actuator-dashboard", handleActuatorDashboard)
 	http.HandleFunc("/api/host-metrics", handleHostMetrics)
 	http.HandleFunc("/api/pod-metrics", handlePodMetrics)
 	http.HandleFunc("/api/alert-config", handleAlertConfig) // 添加更新警报配置的接口

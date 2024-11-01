@@ -55,7 +55,7 @@
         .sort-container {
             display: flex;
             align-items: center;
-            justify-content: flex-end; /* 将内容对齐到右边 */
+            justify-content: flex-end;
             margin-bottom: 10px;
         }
 
@@ -69,9 +69,14 @@
 
         #hosts {
             display: flex;
-            flex-wrap: wrap;
+            flex-direction: column;
             gap: 20px;
-            justify-content: space-between;
+        }
+
+        .host-group {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
         }
 
         .host-box {
@@ -80,8 +85,6 @@
             border-radius: 12px;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
             padding: 20px;
-            width: calc(25% - 20px);
-            box-sizing: border-box;
             cursor: pointer;
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
@@ -136,43 +139,17 @@
             background: linear-gradient(90deg, #f48fb1, #e91e63);
         }
 
-        @media (max-width: 1200px) {
-            .host-box {
-                width: calc(33.33% - 20px);
-            }
-        }
-
-        @media (max-width: 900px) {
-            .host-box {
-                width: calc(50% - 20px);
-            }
-        }
-
-        @media (max-width: 600px) {
-            .host-box {
-                width: 100%;
-            }
-        }
-
         .toggle-container {
             display: flex;
             align-items: center;
-            margin-left: 20px; /* 调整左侧间距 */
+            margin-left: 20px;
         }
 
         .toggle {
-            width: 80px; /* 增加开关宽度 */
-            height: 20px; /* 增加开关高度 */
+            width: 80px;
+            height: 20px;
             cursor: pointer;
         }
-
-        /*.toggle-label {*/
-        /*    margin-left: 16px; !* 调整标签与开关的间距 *!*/
-        /*    font-size: 16px; !* 增加文字大小 *!*/
-        /*    color: #333; !* 调整文字颜色 *!*/
-        /*    text-align: center;*/
-        /*    width: 80px;*/
-        /*}*/
 
         .toggle {
             display: none;
@@ -186,7 +163,7 @@
             width: 80px;
             position: relative;
             transition: background-color 0.3s;
-            color: #333; /* 调整文字颜色 */
+            color: #333;
             text-align: right;
         }
 
@@ -216,9 +193,11 @@
 <body>
 <div class="sidebar">
     <h2>导航</h2>
-    <a href="#" onclick="navigateTo('dashboard')">仪表板</a>
-    <a href="#" onclick="navigateTo('alert-config')">警报配置</a>
-    <a href="#" onclick="navigateTo('pod-metrics')">Pod监测</a>
+    <a href="index.html">仪表板</a>
+    <a href="alert-config.html">警报配置</a>
+    <a href="pod-metrics.html">Pod监测</a>
+    <a href="host-manager.html">主机管理</a>
+    <a href="http://10.15.97.110:21120/html/">X-Flood压测</a>
 </div>
 <div class="container">
     <h1>中台服务器 监控仪表板</h1>
@@ -229,6 +208,7 @@
             <option value="cpu">按 CPU 占用排序</option>
             <option value="memory">按 内存 占用排序</option>
             <option value="disk">按 磁盘 占用排序</option>
+            <option value="label">按 标签 分组</option>
         </select>
         <div class="toggle-container">
             <input type="checkbox" id="detailToggle" class="toggle">
@@ -242,7 +222,6 @@
     let sortOrder = 'ip';
     const detailToggle = document.getElementById('detailToggle');
 
-    // Load the switch state from localStorage
     window.onload = function() {
         const isDetailMode = localStorage.getItem('detailMode') === 'true';
         detailToggle.checked = isDetailMode;
@@ -254,102 +233,145 @@
         loadHostData();
     });
 
-    function navigateTo(page) {
-        if (page === 'alert-config') {
-            window.location.href = 'alert-config.html';
-        } else if (page === 'dashboard') {
-            window.location.href = 'index.html';
-        } else if (page === 'pod-metrics'){
-            window.location.href = 'pod-metrics.html';
-        } else {
-            alert('其他页面尚未实现');
-        }
-    }
-
     function loadHostData() {
         fetch('/api/dashboard')
             .then(response => response.json())
             .then(data => {
-                data.sort((a, b) => {
-                    if (sortOrder === 'cpu') {
-                        return b.cpu_usage - a.cpu_usage;
-                    } else if (sortOrder === 'memory') {
-                        return b.memory_usage - a.memory_usage;
-                    } else if (sortOrder === 'disk') {
-                        return b.disk_usage - a.disk_usage;
-                    } else {
-                        return a.ip.localeCompare(b.ip);
-                    }
-                });
-
-                const hostContainer = document.getElementById('hosts');
-                hostContainer.innerHTML = '';
-
-                data.forEach(host => {
-                    const hostDiv = document.createElement('div');
-                    hostDiv.className = 'host-box';
-                    hostDiv.onclick = function () {
-                        window.location.href = `host-metrics.html?host=${host.ip}`;
-                    };
-
-                    const cpuColor = host.cpu_usage > 90 ? 'red' : 'green';
-                    const memoryColor = host.memory_usage > 90 ? 'red' : 'green';
-                    const diskColor = host.disk_usage > 85 ? 'red' : 'green';
-                    const netIoColor = host.network_io > 15 ? 'red' : 'green';
-                    const readWriteIoColor = host.read_write_io > 30 ? 'red' : 'green';
-
-                    let metricsHTML = `
-                        <h2>主机: ${host.ip}</h2>
-                        <div class="metrics">
-                            <div class="metric">
-                                <div class="progress-bar">
-                                    <div class="progress-fill progress-cpu" style="width: ${host.cpu_usage}%; background-color: ${cpuColor};"></div>
-                                </div>
-                                <span style="color: ${cpuColor};">CPU 使用率: ${host.cpu_usage.toFixed(2)}%</span>
-                            </div>
-                            <div class="metric">
-                                <div class="progress-bar">
-                                    <div class="progress-fill progress-memory" style="width: ${host.memory_usage}%; background-color: ${memoryColor};"></div>
-                                </div>
-                                <span style="color: ${memoryColor};">内存 使用率: ${host.memory_usage.toFixed(2)}%</span>
-                            </div>
-                    `;
-
-                    // Only include additional metrics if detail toggle is on
-                    if (detailToggle.checked) {
-                        metricsHTML += `
-                            <div class="metric">
-                                <div class="progress-bar">
-                                    <div class="progress-fill progress-network_io" style="width: ${host.network_io * 10}%; background-color: ${netIoColor};"></div>
-                                </div>
-                                <span style="color: ${netIoColor};">网络IO : ${host.network_io.toFixed(2)} MB</span>
-                            </div>
-                            <div class="metric">
-                                <div class="progress-bar">
-                                    <div class="progress-fill progress-network_io" style="width: ${host.read_write_io * 1}%; background-color: ${readWriteIoColor};"></div>
-                                </div>
-                                <span style="color: ${readWriteIoColor};">磁盘IO : ${host.read_write_io.toFixed(2)} MB</span>
-                            </div>
-                            <div class="metric">
-                                <div class="progress-bar">
-                                    <div class="progress-fill progress-network_io" style="width: ${host.net_conn_count * 0.1}%; background-color: ${readWriteIoColor};"></div>
-                                </div>
-                                <span style="color: ${readWriteIoColor};">网络连接数 : ${host.net_conn_count}</span>
-                            </div>
-                            <div class="metric">
-                                <div class="progress-bar">
-                                    <div class="progress-fill progress-disk" style="width: ${host.disk_usage}%; background-color: ${diskColor};"></div>
-                                </div>
-                                <span style="color: ${diskColor};">磁盘 使用率: ${host.disk_usage.toFixed(2)}%</span>
-                            </div>
-                        `;
-                    }
-
-                    metricsHTML += `</div></div>`;
-                    hostDiv.innerHTML = metricsHTML;
-                    hostContainer.appendChild(hostDiv);
-                });
+                renderHosts(data);
             });
+    }
+
+    function renderHosts(data) {
+        const hostContainer = document.getElementById('hosts');
+        hostContainer.innerHTML = '';
+
+        if (sortOrder === 'label') {
+            const groupedData = groupByLabel(data);
+            Object.keys(groupedData).sort().forEach(label => {
+                renderGroup(label, groupedData[label], hostContainer);
+            });
+        } else {
+            const sortedData = sortData(data);
+            renderGroup(null, sortedData, hostContainer);
+        }
+    }
+
+    function groupByLabel(data) {
+        const groupedData = data.reduce((acc, host) => {
+            const label = host.label || '未分组';
+            if (!acc[label]) {
+                acc[label] = [];
+            }
+            acc[label].push(host);
+            return acc;
+        }, {});
+
+        // 对每个分组内的主机列表按 IP 地址排序
+        Object.keys(groupedData).forEach(label => {
+            groupedData[label].sort((a, b) => a.ip.localeCompare(b.ip));
+        });
+        return groupedData;
+    }
+
+    function sortData(data) {
+        return data.sort((a, b) => {
+            if (sortOrder === 'cpu') {
+                return b.cpu_usage - a.cpu_usage;
+            } else if (sortOrder === 'memory') {
+                return b.memory_usage - a.memory_usage;
+            } else if (sortOrder === 'disk') {
+                return b.disk_usage - a.disk_usage;
+            } else {
+                return a.ip.localeCompare(b.ip);
+            }
+        });
+    }
+
+    function renderGroup(label, hosts, container) {
+        if (label) {
+            const groupTitle = document.createElement('h2');
+            groupTitle.textContent = `标签: ${label}`;
+            groupTitle.style.marginTop = '20px';
+            groupTitle.style.color = '#333';
+            container.appendChild(groupTitle);
+        }
+
+        const groupContainer = document.createElement('div');
+        groupContainer.className = 'host-group';
+        container.appendChild(groupContainer);
+
+        hosts.forEach(host => {
+            groupContainer.appendChild(createHostBox(host));
+        });
+    }
+
+    function createHostBox(host) {
+        const hostDiv = document.createElement('div');
+        hostDiv.className = 'host-box';
+        hostDiv.onclick = function () {
+            window.location.href = `host-metrics.html?host=${host.ip}`;
+        };
+
+        const metricsHTML = generateMetricsHTML(host);
+        hostDiv.innerHTML = metricsHTML;
+        return hostDiv;
+    }
+
+    function generateMetricsHTML(host) {
+        const cpuColor = host.cpu_usage > 90 ? 'red' : 'green';
+        const memoryColor = host.memory_usage > 90 ? 'red' : 'green';
+        const diskColor = host.disk_usage > 85 ? 'red' : 'green';
+        const netIoColor = host.network_io > 15 ? 'red' : 'green';
+        const readWriteIoColor = host.read_write_io > 30 ? 'red' : 'green';
+
+        let metricsHTML = `
+            <h2>主机: ${host.ip}</h2>
+            <div class="metrics">
+                <div class="metric">
+                    <div class="progress-bar">
+                        <div class="progress-fill progress-cpu" style="width: ${host.cpu_usage}%; background-color: ${cpuColor};"></div>
+                    </div>
+                    <span style="color: ${cpuColor};">CPU 使用率: ${host.cpu_usage.toFixed(2)}%</span>
+                </div>
+                <div class="metric">
+                    <div class="progress-bar">
+                        <div class="progress-fill progress-memory" style="width: ${host.memory_usage}%; background-color: ${memoryColor};"></div>
+                    </div>
+                    <span style="color: ${memoryColor};">内存 使用率: ${host.memory_usage.toFixed(2)}%</span>
+                </div>
+        `;
+
+        if (detailToggle.checked) {
+            metricsHTML += `
+                <div class="metric">
+                    <div class="progress-bar">
+                        <div class="progress-fill progress-network_io" style="width: ${host.network_io * 10}%; background-color: ${netIoColor};"></div>
+                    </div>
+                    <span style="color: ${netIoColor};">网络IO : ${host.network_io.toFixed(2)} MB</span>
+                </div>
+                <div class="metric">
+                    <div class="progress-bar">
+                        <div class="progress-fill progress-network_io" style="width: ${host.read_write_io * 1}%; background-color: ${readWriteIoColor};"></div>
+                    </div>
+                    <span style="color: ${readWriteIoColor};">磁盘IO : ${host.read_write_io.toFixed(2)} MB</span>
+                </div>
+                <div class="metric">
+                    <div class="progress-bar">
+                        <div class="progress-fill progress-network_io" style="width: ${host.net_conn_count * 0.1}%; background-color: ${readWriteIoColor};"></div>
+                    </div>
+                    <span style="color: ${readWriteIoColor};">网络连接数 : ${host.net_conn_count}</span>
+                </div>
+                <div class="metric">
+                    <div class="progress-bar">
+                        <div class="progress-fill progress-disk" style="width: ${host.disk_usage}%; background-color: ${diskColor};"></div>
+                    </div>
+                    <span style="color: ${diskColor};">磁盘 使用率: ${host.disk_usage.toFixed(2)}%</span>
+                </div>
+            `;
+        }
+
+        metricsHTML += `</div>`;
+        return metricsHTML;
     }
 
     document.getElementById('sort').addEventListener('change', function() {

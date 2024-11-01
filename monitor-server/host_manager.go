@@ -11,15 +11,16 @@ import (
 type Host struct {
 	ID           int    `json:"id"`
 	IPAddress    string `json:"ip_address"`
+	Label        string `json:"label"`
 	AlertEnabled bool   `json:"alert_enabled"`
 }
 
-var hosts = make(map[string]Host) // 内存中的主机信息
-var hostLock = sync.RWMutex{}     // 读写锁，保证并发安全
+var HostManage = make(map[string]Host) // 内存中的主机信息
+var hostLock = sync.RWMutex{}          // 读写锁，保证并发安全
 
 // 从数据库加载所有主机信息
 func loadHostsFromDB() {
-	query := `SELECT id, ip_address, alert_enabled FROM hosts`
+	query := `SELECT id, ip_address,IFNULL(label, ''), alert_enabled FROM hosts`
 	rows, err := db.Query(query)
 	if err != nil {
 		log.Fatalf("Failed to load hosts: %v", err)
@@ -31,12 +32,12 @@ func loadHostsFromDB() {
 
 	for rows.Next() {
 		var h Host
-		err := rows.Scan(&h.ID, &h.IPAddress, &h.AlertEnabled)
+		err := rows.Scan(&h.ID, &h.IPAddress, &h.Label, &h.AlertEnabled)
 		if err != nil {
 			log.Printf("Error scanning host row: %v", err)
 			continue
 		}
-		hosts[h.IPAddress] = h
+		HostManage[h.IPAddress] = h
 	}
 
 	fmt.Println("Successfully loaded hosts from database")
@@ -44,11 +45,11 @@ func loadHostsFromDB() {
 
 // 增加或更新主机信息
 func addHostInDB(host Host) error {
-	query := `REPLACE INTO hosts (ip_address, alert_enabled) VALUES (?, ?)`
-	_, err := db.Exec(query, host.IPAddress, host.AlertEnabled)
+	query := `REPLACE INTO hosts (ip_address,label, alert_enabled) VALUES (?, ?, ?)`
+	_, err := db.Exec(query, host.IPAddress, host.Label, host.AlertEnabled)
 	if err == nil {
 		hostLock.Lock()
-		hosts[host.IPAddress] = host
+		HostManage[host.IPAddress] = host
 		hostLock.Unlock()
 	}
 	return err
@@ -60,7 +61,7 @@ func updateHostInDB(host Host) error {
 	_, err := db.Exec(query, host.AlertEnabled, host.IPAddress)
 	if err == nil {
 		hostLock.Lock()
-		hosts[host.IPAddress] = host
+		HostManage[host.IPAddress] = host
 		hostLock.Unlock()
 	}
 	return err
@@ -72,7 +73,7 @@ func deleteHostFromDB(ip string) error {
 	_, err := db.Exec(query, ip)
 	if err == nil {
 		hostLock.Lock()
-		delete(hosts, ip)
+		delete(HostManage, ip)
 		hostLock.Unlock()
 	}
 	return err
@@ -124,7 +125,7 @@ func handleHostManagement(w http.ResponseWriter, r *http.Request) {
 		defer hostLock.RUnlock()
 
 		var tempHosts []Host
-		for _, host := range hosts {
+		for _, host := range HostManage {
 			tempHosts = append(tempHosts, host)
 		}
 		json.NewEncoder(w).Encode(tempHosts)
