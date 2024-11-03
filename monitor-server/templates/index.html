@@ -204,11 +204,11 @@
     <div class="sort-container">
         <label for="sort">排序依据:</label>
         <select id="sort" onchange="loadHostData()">
+            <option value="label">按 标签 分组</option>
             <option value="ip">按 IP 排序</option>
             <option value="cpu">按 CPU 占用排序</option>
             <option value="memory">按 内存 占用排序</option>
             <option value="disk">按 磁盘 占用排序</option>
-            <option value="label">按 标签 分组</option>
         </select>
         <div class="toggle-container">
             <input type="checkbox" id="detailToggle" class="toggle">
@@ -219,7 +219,7 @@
 </div>
 
 <script>
-    let sortOrder = 'ip';
+    let sortOrder = 'label';
     const detailToggle = document.getElementById('detailToggle');
 
     window.onload = function() {

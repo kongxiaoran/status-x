@@ -131,7 +131,12 @@ func sendAlert(hostIP string, resourceType string) {
 	default:
 
 	}
-	sendAlertToHttp("中台服务器监控\n发生告警：主机（"+hostIP+"）, "+msg, "kongxr")
+	name := hostIP
+	currentHost, exists := HostManage[hostIP]
+	if exists && currentHost.Label != "" {
+		name = name + "|" + currentHost.Label
+	}
+	sendAlertToHttp("中台服务器监控\n发生告警：主机（"+name+"）, "+msg, "kongxr")
 	log.Println("中台服务器监控\n发生告警：主机（" + hostIP + "）, " + msg)
 }
 
