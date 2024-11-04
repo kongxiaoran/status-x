@@ -7,9 +7,9 @@ docker build -t status-x:0.0.2 .
 docker tag status-x:0.0.2 10.15.98.150/library-hf/status-x:0.0.2
 docker push 10.15.98.150/library-hf/status-x:0.0.1
 
-docker build -t status-x:0.0.3 .
-docker tag status-x:0.0.3 dockerhubbs.finchina.com/finchina-dev/status-x:0.0.3
-docker push dockerhubbs.finchina.com/finchina-dev/status-x:0.0.3
+docker build -t status-x:0.0.4 .
+docker tag status-x:0.0.4 dockerhubbs.finchina.com/finchina-dev/status-x:0.0.4
+docker push dockerhubbs.finchina.com/finchina-dev/status-x:0.0.4
 
 
 docker run -d --name mysql5.8 -p 13306:3306 -e MYSQL_ROOT_PASSWORD=11111111 -v /app/status-x/mysqlDate:/var/lib/mysql --restart unless-stopped mysql:5.8 --default-authentication-plugin=mysql_native_password --bind-address=0.0.0.0
@@ -17,9 +17,9 @@ docker run -d --name mysql5.8 -p 13306:3306 -e MYSQL_ROOT_PASSWORD=11111111 -v /
 docker login -u tcdept-hf -p Tcdept@427 dockerhubbs.finchina.com
 116 服务器
 
-docker build -t status-x-server:0.0.3 .
-docker tag status-x-server:0.0.3 dockerhubbs.finchina.com/finchina-dev/status-x-server:0.0.3
-docker push dockerhubbs.finchina.com/finchina-dev/status-x-server:0.0.3 
+docker build -t status-x-server:0.0.4 .
+docker tag status-x-server:0.0.4 dockerhubbs.finchina.com/finchina-dev/status-x-server:0.0.4
+docker push dockerhubbs.finchina.com/finchina-dev/status-x-server:0.0.4
 
 
 

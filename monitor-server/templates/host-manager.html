@@ -12,6 +12,7 @@
             background-color: #f4f4f4;
             display: flex;
         }
+
         .sidebar {
             width: 200px;
             background-color: #333;
@@ -19,10 +20,12 @@
             padding: 20px;
             height: 100vh;
         }
+
         .sidebar h2 {
             font-size: 18px;
             margin: 0 0 20px;
         }
+
         .sidebar a {
             color: #fff;
             text-decoration: none;
@@ -32,27 +35,33 @@
             border-radius: 5px;
             transition: background 0.3s;
         }
+
         .sidebar a:hover {
             background-color: #444;
         }
+
         .container {
             flex: 1;
             padding: 20px;
         }
+
         h1 {
             text-align: center;
             margin-bottom: 20px;
             color: #333;
             font-size: 32px;
         }
+
         .form-group {
             margin-bottom: 20px;
         }
+
         label {
             display: block;
             margin-bottom: 5px;
             font-weight: bold;
         }
+
         input[type="text"] {
             width: 20%;
             padding: 10px;
@@ -60,9 +69,11 @@
             border-radius: 5px;
             font-size: 16px;
         }
+
         input[type="checkbox"] {
             margin-right: 10px;
         }
+
         button {
             padding: 10px 20px;
             background-color: #28a745;
@@ -72,19 +83,23 @@
             cursor: pointer;
             font-size: 16px;
         }
+
         button:hover {
             background-color: #218838;
         }
+
         table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
         }
+
         th, td {
             border: 1px solid #ddd;
             padding: 10px;
             text-align: left;
         }
+
         th {
             background-color: #f2f2f2;
         }
@@ -136,7 +151,7 @@
         <tr>
             <th>IP 地址</th>
             <td>主机标签</td>
-            <th>是否开启预警</th>
+            <th>是否开启离线预警</th>
             <th>操作</th>
         </tr>
         </thead>
@@ -156,6 +171,18 @@
                 if (data != null) {
                     const tableBody = document.getElementById('host-table-body');
                     tableBody.innerHTML = ''; // 清空当前表格内容
+                    data.sort((a, b) => {
+                        // 将 IP 地址转换为可比较的数值
+                        const aParts = a.ip_address.split('.').map(Number);
+                        const bParts = b.ip_address.split('.').map(Number);
+
+                        for (let i = 0; i < 4; i++) {
+                            if (aParts[i] !== bParts[i]) {
+                                return aParts[i] - bParts[i]; // 升序比较
+                            }
+                        }
+                        return 0; // 相等时返回 0
+                    });
                     data.forEach(host => {
                         const row = document.createElement('tr');
                         row.innerHTML = `
@@ -163,7 +190,7 @@
                             <td>${host.label}</td>
                             <td>
                                 <input type="checkbox" ${host.alert_enabled ? 'checked' : ''}
-                                    onchange="toggleAlert('${host.ip_address}', this.checked)">
+                                    onchange="toggleAlert('${host.ip_address}', '${host.label}',this.checked)">
                             </td>
                             <td>
                                 <button onclick="deleteHost('${host.ip_address}')">删除</button>
@@ -192,7 +219,7 @@
         const data = {
             ip_address: ipAddress,
             alert_enabled: alertEnabled,
-            label:label
+            label: label
         };
 
         fetch('/api/host-management', {
@@ -237,10 +264,11 @@
         loadHosts();
     }
 
-    function toggleAlert(ipAddress, alertEnabled) {
+    function toggleAlert(ipAddress, label, alertEnabled) {
         const data = {
             ip_address: ipAddress,
-            alert_enabled: alertEnabled
+            alert_enabled: alertEnabled,
+            label: label
         };
 
         fetch('/api/host-management', {

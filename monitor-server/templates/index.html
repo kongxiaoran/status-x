@@ -70,7 +70,7 @@
         #hosts {
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            /*gap: 20px;*/
         }
 
         .host-group {
@@ -188,6 +188,7 @@
         .toggle:checked + .toggle-label::after {
             left: 25px;
         }
+
     </style>
 </head>
 <body>
@@ -222,13 +223,13 @@
     let sortOrder = 'label';
     const detailToggle = document.getElementById('detailToggle');
 
-    window.onload = function() {
+    window.onload = function () {
         const isDetailMode = localStorage.getItem('detailMode') === 'true';
         detailToggle.checked = isDetailMode;
         loadHostData();
     };
 
-    detailToggle.addEventListener('change', function() {
+    detailToggle.addEventListener('change', function () {
         localStorage.setItem('detailMode', this.checked);
         loadHostData();
     });
@@ -289,11 +290,42 @@
 
     function renderGroup(label, hosts, container) {
         if (label) {
+            // 计算总 CPU、内存和磁盘使用率
+            const totalMetrics = hosts.reduce((acc, host) => {
+                acc.cpuUsage += host.cpu_usage;
+                acc.memoryUsage += host.memory_usage;
+                acc.diskUsage += host.disk_usage;
+                acc.cpuCores += host.cpu_cores; // 总 CPU 核心数
+                acc.totalMemory += host.total_memory; // 总内存大小
+                acc.totalDisk += host.total_disk; // 总磁盘大小
+                return acc;
+            }, {cpuUsage: 0, memoryUsage: 0, diskUsage: 0, cpuCores: 0, totalMemory: 0, totalDisk: 0});
+
+            // 计算主机数量
+            const hostCount = hosts.length;
+
+            // 计算平均使用率
+            const avgCpu = (totalMetrics.cpuUsage / hostCount).toFixed(2);
+            const avgMemory = (totalMetrics.memoryUsage / hostCount).toFixed(2);
+            const avgDisk = (totalMetrics.diskUsage / hostCount).toFixed(2);
+
+            // 计算总和
+            const totalCores = totalMetrics.cpuCores;
+            const totalMemSize = (totalMetrics.totalMemory / 1024 / 1024 / 1024).toFixed(2); // 转为GB
+            const totalDiskSize = (totalMetrics.totalDisk / 1024 / 1024 / 1024).toFixed(2); // 转为GB
+
             const groupTitle = document.createElement('h2');
-            groupTitle.textContent = `标签: ${label}`;
+            groupTitle.innerHTML = `标签: ${label}`;
+            const groupStatistics = document.createElement('div')
+            groupStatistics.innerHTML = `核心数: ${totalCores}, 内存总大小: ${totalMemSize} GB, 磁盘总大小: ${totalDiskSize} GB</br>
+            CPU: ${avgCpu}%, 内存: ${avgMemory}%, 磁盘: ${avgDisk}% `
+            groupStatistics.style.marginBottom = '20px';
+            groupStatistics.style.color = '#acc262';
+
             groupTitle.style.marginTop = '20px';
             groupTitle.style.color = '#333';
             container.appendChild(groupTitle);
+            container.appendChild(groupStatistics)
         }
 
         const groupContainer = document.createElement('div');
@@ -324,10 +356,19 @@
         const netIoColor = host.network_io > 15 ? 'red' : 'green';
         const readWriteIoColor = host.read_write_io > 30 ? 'red' : 'green';
 
+
         let metricsHTML = `
             <h2>主机: ${host.ip}</h2>
-            <div class="metrics">
-                <div class="metric">
+            <div class="metrics">`
+
+        if (host.cpu_cores !== 0) {
+            metricsHTML = metricsHTML + `<div style="display: flex; align-items: center;gap: 10px">
+                <span style="color: black;">核心数: ${host.cpu_cores}</span>
+                <span style="color: black;">内存大小: ${(host.total_memory / 1024 / 1024 / 1024).toFixed(2)} GB</span>
+                <span style="color: black;">磁盘大小: ${(host.total_disk / 1024 / 1024 / 1024).toFixed(2)} GB</span>
+            </div>`
+        }
+        metricsHTML = metricsHTML + `<div class="metric">
                     <div class="progress-bar">
                         <div class="progress-fill progress-cpu" style="width: ${host.cpu_usage}%; background-color: ${cpuColor};"></div>
                     </div>
@@ -374,7 +415,7 @@
         return metricsHTML;
     }
 
-    document.getElementById('sort').addEventListener('change', function() {
+    document.getElementById('sort').addEventListener('change', function () {
         sortOrder = this.value;
         loadHostData();
     });

@@ -24,6 +24,9 @@ type HostData struct {
 	CPUUsage     float64 `json:"cpu_usage"`
 	MemoryUsage  float64 `json:"memory_usage"`
 	DiskUsage    float64 `json:"disk_usage"`
+	CPUCores     int     `json:"cpu_cores"`      // CPU 核心数
+	TotalMemory  uint64  `json:"total_memory"`   // 总内存
+	TotalDisk    uint64  `json:"total_disk"`     // 总磁盘大小
 	NetworkIO    float64 `json:"network_io"`     // MB
 	ReadWriteIO  float64 `json:"read_write_io"`  // MB
 	NetConnCount int     `json:"net_conn_count"` // 网络连接数
@@ -34,7 +37,7 @@ var IpAdress = ""
 var InfluxURL = "10.10.18.116:8086"
 var ServerURL = "localhost:12800"
 var CollectFrequency = 1
-var MonitorDiskPath = "/"
+var MonitorDiskPath = "all"
 
 // name:admin pass:adminadmin
 var InfluxToken = "wh56EgkTNCyt-oSz_4Uo8l_SYy9R57CnUFy2NZY4bxmjZ9bbBNiMvQ0kdo8W4cwdvP6JrgXY49uXpTI7d5mRtA=="
@@ -46,7 +49,11 @@ func getHostData() (HostData, error) {
 	cpuUsage, _ := cpu.Percent(0, false)
 	memStat, _ := mem.VirtualMemory()
 
+	// 获取 CPU 核心数
+	cpuCores, _ := cpu.Counts(true)
+
 	diskUsage := 0.0
+	var totalDisk uint64
 	if MonitorDiskPath == "all" {
 		partitions, _ := disk.Partitions(false)
 		var totalSpace, totalUsed uint64
@@ -60,9 +67,11 @@ func getHostData() (HostData, error) {
 		if totalSpace > 0 {
 			diskUsage = (float64(totalUsed) / float64(totalSpace)) * 100
 		}
+		totalDisk = totalSpace
 	} else {
 		diskStat, _ := disk.Usage(MonitorDiskPath)
 		diskUsage = diskStat.UsedPercent
+		totalDisk = diskStat.Total
 	}
 
 	netIOCounters, _ := gonet.IOCounters(false)
@@ -99,6 +108,9 @@ func getHostData() (HostData, error) {
 		CPUUsage:     cpuUsage[0],
 		MemoryUsage:  memStat.UsedPercent,
 		DiskUsage:    diskUsage,
+		CPUCores:     cpuCores,
+		TotalMemory:  memStat.Total,
+		TotalDisk:    totalDisk,
 		NetworkIO:    netWorkIO,
 		ReadWriteIO:  readAndWriteIO,
 		NetConnCount: len(connStats),

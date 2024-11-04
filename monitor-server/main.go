@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -72,23 +71,48 @@ func main() {
 
 	go func() {
 		for {
-			if podMetricsList != nil {
-				var actuatorHostTemp []HostData
-				for _, pod := range podMetricsList {
-					if strings.Contains(pod.Hostname, "information") {
-						actuator := getPodActuator(pod.IP)
-						podMetricsListMu.Lock()
-						pod.ActuatorMetrics = actuator
-						actuatorHostTemp = append(actuatorHostTemp, pod)
-						podMetricsListMu.Unlock()
+			for _, host := range HostManage {
+				currentTime := time.Now().Unix()
+				// 获取该主机最新的上传记录的时间戳
+				if _, exists := dataStore[host.IPAddress]; !exists {
+					continue
+				}
+				latestTime := dataStore[host.IPAddress].Timestamp
+				lastOfflineTime := dataStore[host.IPAddress].LastOfflineAlertTime
+				// 触发离线
+				if currentTime-latestTime > 60 && host.AlertEnabled {
+					// 判断是否重复报警
+					if currentTime-lastOfflineTime > 600 || lastOfflineTime == 0 {
+						SendAlert(host.IPAddress, "offline")
+						storeLock.Lock()
+						dataStore[host.IPAddress].LastOfflineAlertTime = currentTime
+						storeLock.Unlock()
 					}
 				}
-				actuatorList = actuatorHostTemp
-				writeApplicationMetricsToInflux(actuatorList)
 			}
-			time.Sleep(time.Duration(ActuatorFrequency) * time.Second) // 每 ActuatorFrequency 获取一次数据
+			time.Sleep(time.Duration(ActuatorFrequency) * time.Second) // 每 ActuatorFrequency 检查一次
 		}
 	}()
+
+	//go func() {
+	//	for {
+	//		if podMetricsList != nil {
+	//			var actuatorHostTemp []HostData
+	//			for _, pod := range podMetricsList {
+	//				if strings.Contains(pod.Hostname, "information") {
+	//					actuator := getPodActuator(pod.IP)
+	//					podMetricsListMu.Lock()
+	//					pod.ActuatorMetrics = actuator
+	//					actuatorHostTemp = append(actuatorHostTemp, pod)
+	//					podMetricsListMu.Unlock()
+	//				}
+	//			}
+	//			actuatorList = actuatorHostTemp
+	//			writeApplicationMetricsToInflux(actuatorList)
+	//		}
+	//		time.Sleep(time.Duration(ActuatorFrequency) * time.Second) // 每 ActuatorFrequency 获取一次数据
+	//	}
+	//}()
 
 	http.HandleFunc("/api/host-data", handleHostData)
 	http.HandleFunc("/api/dashboard", handleDashboard)

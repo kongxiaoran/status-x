@@ -10,22 +10,26 @@ import (
 )
 
 type HostData struct {
-	Hostname        string  `json:"hostname"`
-	IP              string  `json:"ip"`
-	NodeIP          string  `json:"node_ip"`
-	Label           string  `json:"label"`
-	NameSpace       string  `json:"name_space"`
-	CPUUsage        float64 `json:"cpu_usage"`
-	MemoryUsage     float64 `json:"memory_usage"`
-	DiskUsage       float64 `json:"disk_usage"`
-	NetworkIO       float64 `json:"network_io"`
-	ReadWriteIO     float64 `json:"read_write_io"`
-	NetConnCount    int     `json:"net_conn_count"` // 网络连接数
-	Timestamp       int64   `json:"timestamp"`
-	ActuatorMetrics map[string]interface{}
+	Hostname             string  `json:"hostname"`
+	IP                   string  `json:"ip"`
+	NodeIP               string  `json:"node_ip"`
+	Label                string  `json:"label"`
+	NameSpace            string  `json:"name_space"`
+	CPUUsage             float64 `json:"cpu_usage"`
+	MemoryUsage          float64 `json:"memory_usage"`
+	DiskUsage            float64 `json:"disk_usage"`
+	CPUCores             int     `json:"cpu_cores"`    // CPU 核心数
+	TotalMemory          uint64  `json:"total_memory"` // 总内存
+	TotalDisk            uint64  `json:"total_disk"`   // 总磁盘大小
+	NetworkIO            float64 `json:"network_io"`
+	ReadWriteIO          float64 `json:"read_write_io"`
+	NetConnCount         int     `json:"net_conn_count"` // 网络连接数
+	Timestamp            int64   `json:"timestamp"`
+	LastOfflineAlertTime int64   `json:"last_offline_alert_time"` // 最新离线报警时间
+	ActuatorMetrics      map[string]interface{}
 }
 
-var dataStore = make(map[string]HostData)
+var dataStore = make(map[string]*HostData)
 var storeLock = sync.RWMutex{}
 
 func handleHostData(w http.ResponseWriter, r *http.Request) {
@@ -35,6 +39,7 @@ func handleHostData(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var hostData HostData
+	hostData.LastOfflineAlertTime = 0
 	err := json.NewDecoder(r.Body).Decode(&hostData)
 	if err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
@@ -43,7 +48,10 @@ func handleHostData(w http.ResponseWriter, r *http.Request) {
 
 	storeLock.Lock()
 	hostData.Timestamp = time.Now().Unix()
-	dataStore[hostData.IP] = hostData
+	if _, exists := dataStore[hostData.IP]; exists {
+		hostData.LastOfflineAlertTime = dataStore[hostData.IP].LastOfflineAlertTime
+	}
+	dataStore[hostData.IP] = &hostData
 	storeLock.Unlock()
 
 	checkAlerts(hostData) // 检查警报
@@ -58,7 +66,7 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 	var hosts []HostData
 	for _, hostData := range dataStore {
 		hostData.Label = HostManage[hostData.IP].Label
-		hosts = append(hosts, hostData)
+		hosts = append(hosts, *hostData)
 	}
 
 	json.NewEncoder(w).Encode(hosts)

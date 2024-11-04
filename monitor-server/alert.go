@@ -75,7 +75,7 @@ func handleAlertConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 // 发送 HTTP POST 请求到接口
-func sendAlertToHttp(content string, receive string) {
+func SendAlertToHttp(content string, receive string) {
 	//url := "http://222.73.12.12:8008/api/SendAppMsg"
 	//payload := map[string]interface{}{
 	//	"touser": receive,
@@ -118,7 +118,7 @@ func sendAlertToHttp(content string, receive string) {
 	fmt.Println("HTTP Response:", string(body))
 }
 
-func sendAlert(hostIP string, resourceType string) {
+func SendAlert(hostIP string, resourceType string) {
 
 	var msg = ""
 	switch resourceType {
@@ -128,6 +128,8 @@ func sendAlert(hostIP string, resourceType string) {
 		msg = fmt.Sprintf("内存 持续 %d分钟 占用超过 %0.1f%%, 触发预警阈值", alertConfig.MemoryDuration, alertConfig.MemoryThreshold)
 	case "disk":
 		msg = fmt.Sprintf("磁盘 占用超过 %0.1f%%, 触发预警阈值", alertConfig.DiskThreshold)
+	case "offline":
+		msg = fmt.Sprintf("疑似离线/关机 请注意检查")
 	default:
 
 	}
@@ -136,7 +138,7 @@ func sendAlert(hostIP string, resourceType string) {
 	if exists && currentHost.Label != "" {
 		name = name + "|" + currentHost.Label
 	}
-	sendAlertToHttp("中台服务器监控\n发生告警：主机（"+name+"）, "+msg, "kongxr")
+	SendAlertToHttp("中台服务器监控\n发生告警：主机（"+name+"）, "+msg, "kongxr")
 	log.Println("中台服务器监控\n发生告警：主机（" + hostIP + "）, " + msg)
 }
 
@@ -168,7 +170,7 @@ func checkResource(host HostData, resourceType string, threshold time.Duration) 
 	if threshold == 0 { // 特殊处理磁盘使用率
 		if host.DiskUsage > alertConfig.DiskThreshold {
 			if alertStatus.LastAlertTime.IsZero() || time.Since(alertStatus.LastAlertTime) >= time.Hour {
-				sendAlert(host.IP, "disk")
+				SendAlert(host.IP, "disk")
 				alertStatus.LastAlertTime = time.Now()
 			}
 		} else {
@@ -179,7 +181,7 @@ func checkResource(host HostData, resourceType string, threshold time.Duration) 
 			alertStatus.Count += 1 * time.Second
 			if alertStatus.Count >= threshold {
 				if alertStatus.LastAlertTime.IsZero() || time.Since(alertStatus.LastAlertTime) >= 30*time.Minute {
-					sendAlert(host.IP, resourceType)
+					SendAlert(host.IP, resourceType)
 					alertStatus.LastAlertTime = time.Now()
 					alertStatus.Count = 0 // 重置计数器
 				}
