@@ -12,6 +12,7 @@ type Host struct {
 	ID           int    `json:"id"`
 	IPAddress    string `json:"ip_address"`
 	Label        string `json:"label"`
+	Owner        string `json:"owner"`
 	AlertEnabled bool   `json:"alert_enabled"`
 }
 
@@ -20,7 +21,7 @@ var hostLock = sync.RWMutex{}          // 读写锁，保证并发安全
 
 // 从数据库加载所有主机信息
 func loadHostsFromDB() {
-	query := `SELECT id, ip_address,IFNULL(label, ''), alert_enabled FROM hosts`
+	query := `SELECT id, ip_address,IFNULL(label, ''),IFNULL(owner, ''), alert_enabled FROM hosts`
 	rows, err := db.Query(query)
 	if err != nil {
 		log.Fatalf("Failed to load hosts: %v", err)
@@ -32,7 +33,7 @@ func loadHostsFromDB() {
 
 	for rows.Next() {
 		var h Host
-		err := rows.Scan(&h.ID, &h.IPAddress, &h.Label, &h.AlertEnabled)
+		err := rows.Scan(&h.ID, &h.IPAddress, &h.Label, &h.Owner, &h.AlertEnabled)
 		if err != nil {
 			log.Printf("Error scanning host row: %v", err)
 			continue
@@ -45,8 +46,8 @@ func loadHostsFromDB() {
 
 // 增加或更新主机信息
 func addHostInDB(host Host) error {
-	query := `REPLACE INTO hosts (ip_address,label, alert_enabled) VALUES (?, ?, ?)`
-	_, err := db.Exec(query, host.IPAddress, host.Label, host.AlertEnabled)
+	query := `REPLACE INTO hosts (ip_address,label,owner, alert_enabled) VALUES (?, ?, ?, ?)`
+	_, err := db.Exec(query, host.IPAddress, host.Label, host.Owner, host.AlertEnabled)
 	if err == nil {
 		hostLock.Lock()
 		HostManage[host.IPAddress] = host
@@ -57,8 +58,8 @@ func addHostInDB(host Host) error {
 
 // 增加或更新主机信息
 func updateHostInDB(host Host) error {
-	query := `UPDATE hosts SET alert_enabled = ? WHERE ip_address = ?;`
-	_, err := db.Exec(query, host.AlertEnabled, host.IPAddress)
+	query := `UPDATE hosts SET alert_enabled = ?,owner = ?  WHERE ip_address = ?;`
+	_, err := db.Exec(query, host.AlertEnabled, host.Owner, host.IPAddress)
 	if err == nil {
 		hostLock.Lock()
 		HostManage[host.IPAddress] = host

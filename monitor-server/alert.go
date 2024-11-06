@@ -75,7 +75,7 @@ func handleAlertConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 // 发送 HTTP POST 请求到接口
-func SendAlertToHttp(content string, receive string) {
+func SendAlertToHttp(content string) {
 	//url := "http://222.73.12.12:8008/api/SendAppMsg"
 	//payload := map[string]interface{}{
 	//	"touser": receive,
@@ -84,10 +84,19 @@ func SendAlertToHttp(content string, receive string) {
 	//	},
 	//}
 
-	url := "http://222.73.12.12:8008/api/SendChatMsg"
+	//url := "http://222.73.12.12:8008/api/SendChatMsg"
+	//payload := map[string]interface{}{
+	//	"chatid": 267,
+	//	"text": map[string]string{
+	//		"content": content,
+	//	},
+	//}
+
+	url := "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b28f4f07-bc17-4a5a-815b-89f8ca485ba2"
+
 	payload := map[string]interface{}{
-		"chatid": 267,
-		"text": map[string]string{
+		"msgtype": "markdown",
+		"markdown": map[string]interface{}{
 			"content": content,
 		},
 	}
@@ -129,17 +138,22 @@ func SendAlert(hostIP string, resourceType string) {
 	case "disk":
 		msg = fmt.Sprintf("磁盘 占用超过 %0.1f%%, 触发预警阈值", alertConfig.DiskThreshold)
 	case "offline":
-		msg = fmt.Sprintf("疑似离线/关机 请注意检查")
+		msg = fmt.Sprintf("离线/关机 请注意检查")
 	default:
 
 	}
 	name := hostIP
 	currentHost, exists := HostManage[hostIP]
 	if exists && currentHost.Label != "" {
-		name = name + "|" + currentHost.Label
+		name = name + " | " + currentHost.Label
 	}
-	SendAlertToHttp("中台服务器监控\n发生告警：主机（"+name+"）, "+msg, "kongxr")
-	log.Println("中台服务器监控\n发生告警：主机（" + hostIP + "）, " + msg)
+	owner := "all"
+	if exists && currentHost.Owner != "" {
+		owner = currentHost.Owner
+	}
+	alertMessage := fmt.Sprintf("[中台服务器监控](http://10.15.97.66:42800/)\n发生告警：主机 [%s](http://10.15.97.66:42800/), %s\n<@%s>", name, msg, owner)
+	SendAlertToHttp(alertMessage)
+	log.Println(alertMessage)
 }
 
 func checkAlerts(host HostData) {

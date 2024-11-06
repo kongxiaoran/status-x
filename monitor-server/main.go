@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	"github.com/gorilla/handlers"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 )
@@ -43,6 +45,7 @@ func init() {
 		ActuatorFrequency = tempEnv
 	}
 }
+
 func main() {
 
 	// 初始化 MySQL 数据库
@@ -126,8 +129,28 @@ func main() {
 
 	log.Println("Server running on :12800")
 
-	fs := http.FileServer(http.Dir("./templates"))
-	http.Handle("/", fs)
+	corsHeaders := handlers.CORS(
+		handlers.AllowedOrigins([]string{"*"}),                                       // 允许所有来源
+		handlers.AllowedMethods([]string{"GET", "POST", "OPTIONS", "PUT", "DELETE"}), // 允许的方法
+		handlers.AllowedHeaders([]string{"Content-Type", "Authorization"}),           // 允许的请求头
+	)
 
-	log.Fatal(http.ListenAndServe(":12800", nil))
+	http.HandleFunc("/vue/", VueHandler)
+
+	htmlFS := http.FileServer(http.Dir("./templates"))
+	http.Handle("/", htmlFS)
+
+	log.Fatal(http.ListenAndServe(":12800", corsHeaders(http.DefaultServeMux)))
+}
+
+func VueHandler(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path[len("/vue/"):]
+	fullPath := filepath.Join("./frontend", path)
+
+	_, err := os.Stat(fullPath)
+	if os.IsNotExist(err) {
+		http.ServeFile(w, r, "./frontend/index.html")
+		return
+	}
+	http.StripPrefix("/vue/", http.FileServer(http.Dir("./frontend"))).ServeHTTP(w, r)
 }
