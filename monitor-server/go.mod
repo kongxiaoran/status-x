@@ -6,6 +6,8 @@ toolchain go1.22.7
 
 require (
 	github.com/go-sql-driver/mysql v1.8.1
+	github.com/gorilla/handlers v1.5.2
+	github.com/gorilla/websocket v1.5.0
 	github.com/influxdata/influxdb-client-go/v2 v2.14.0
 	k8s.io/apimachinery v0.31.1
 	k8s.io/client-go v0.31.1
@@ -29,7 +31,6 @@ require (
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/gorilla/handlers v1.5.2 // indirect
 	github.com/imdario/mergo v0.3.6 // indirect
 	github.com/influxdata/line-protocol v0.0.0-20200327222509-2487e7298839 // indirect
 	github.com/josharian/intern v1.0.0 // indirect

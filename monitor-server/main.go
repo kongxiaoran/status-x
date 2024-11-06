@@ -1,18 +1,34 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
-	"github.com/gorilla/handlers"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
+
+	"github.com/gorilla/handlers"
+	"github.com/gorilla/websocket"
 )
 
 var PodCollectFrequency = 3
 var ActuatorFrequency = 2
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true // 允许所有来源的WebSocket连接
+	},
+}
+
+// 添加WebSocket连接管理
+var (
+	clients    = make(map[*websocket.Conn]bool)
+	clientsMux sync.Mutex
+)
 
 func init() {
 	if influxTokenEnv := os.Getenv("INFLUX_TOKEN"); influxTokenEnv != "" {
@@ -74,26 +90,31 @@ func main() {
 
 	go func() {
 		for {
+			hostLock.RLock()  // 添加 HostManage 的读锁
+			storeLock.RLock() // 添加 DataStore 的读锁
 			for _, host := range HostManage {
 				currentTime := time.Now().Unix()
-				// 获取该主机最新的上传记录的时间戳
-				if _, exists := dataStore[host.IPAddress]; !exists {
+				if _, exists := DataStore[host.IPAddress]; !exists {
 					continue
 				}
-				latestTime := dataStore[host.IPAddress].Timestamp
-				lastOfflineTime := dataStore[host.IPAddress].LastOfflineAlertTime
+				latestTime := DataStore[host.IPAddress].Timestamp
+				lastOfflineTime := DataStore[host.IPAddress].LastOfflineAlertTime
 				// 触发离线
 				if currentTime-latestTime > 60 && host.AlertEnabled {
 					// 判断是否重复报警
 					if currentTime-lastOfflineTime > 600 || lastOfflineTime == 0 {
+						storeLock.RUnlock() // 临时释放读锁
+						storeLock.Lock()    // 获取写锁
 						SendAlert(host.IPAddress, "offline")
-						storeLock.Lock()
-						dataStore[host.IPAddress].LastOfflineAlertTime = currentTime
-						storeLock.Unlock()
+						DataStore[host.IPAddress].LastOfflineAlertTime = currentTime
+						storeLock.Unlock() // 释放写锁
+						storeLock.RLock()  // 重新获取读锁
 					}
 				}
 			}
-			time.Sleep(time.Duration(ActuatorFrequency) * time.Second) // 每 ActuatorFrequency 检查一次
+			storeLock.RUnlock() // 释放 DataStore 的读锁
+			hostLock.RUnlock()  // 释放 HostManage 的读锁
+			time.Sleep(time.Duration(ActuatorFrequency) * time.Second)
 		}
 	}()
 
@@ -127,6 +148,12 @@ func main() {
 	http.HandleFunc("/api/alert-metrics", handleAlertMetrics)
 	http.HandleFunc("/api/host-management", handleHostManagement)
 
+	// 添加WebSocket路由
+	http.HandleFunc("/ws/dashboard", handleWebSocket)
+
+	// 启动广播协程
+	go broadcastMetrics()
+
 	log.Println("Server running on :12800")
 
 	corsHeaders := handlers.CORS(
@@ -153,4 +180,78 @@ func VueHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.StripPrefix("/vue/", http.FileServer(http.Dir("./frontend"))).ServeHTTP(w, r)
+}
+
+// 添加WebSocket处理函数
+func handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("WebSocket upgrade failed: %v", err)
+		return
+	}
+	defer conn.Close()
+
+	// 注册新客户端
+	clientsMux.Lock()
+	clients[conn] = true
+	clientsMux.Unlock()
+
+	// 清理断开的客户端
+	defer func() {
+		clientsMux.Lock()
+		delete(clients, conn)
+		clientsMux.Unlock()
+	}()
+
+	// 保持连接并处理消息
+	for {
+		_, _, err := conn.ReadMessage()
+		if err != nil {
+			break
+		}
+	}
+}
+
+// 广播数据给所有连接的客户端
+func broadcastMetrics() {
+	for {
+		// 获取数据时加锁
+		storeLock.RLock()
+		hostLock.RLock() // 添加 HostManage 的读锁
+		var hosts []HostData
+		for _, hostData := range DataStore {
+			hostData.Label = HostManage[hostData.IP].Label // 这里访问 HostManage 需要加锁
+			hosts = append(hosts, *hostData)
+		}
+		hostLock.RUnlock() // 释放 HostManage 的读锁
+		storeLock.RUnlock()
+
+		// 准备要发送的数据
+		data := map[string]interface{}{
+			"hosts":   hosts,
+			"loading": false,
+			"error":   nil,
+		}
+
+		// 序列化数据
+		jsonData, err := json.Marshal(data)
+		if err != nil {
+			log.Printf("JSON marshal error: %v", err)
+			continue
+		}
+
+		// 广播给所有客户端
+		clientsMux.Lock()
+		for client := range clients {
+			err := client.WriteMessage(websocket.TextMessage, jsonData)
+			if err != nil {
+				log.Printf("Write error: %v", err)
+				client.Close()
+				delete(clients, client)
+			}
+		}
+		clientsMux.Unlock()
+
+		time.Sleep(time.Second) // 每秒更新一次
+	}
 }

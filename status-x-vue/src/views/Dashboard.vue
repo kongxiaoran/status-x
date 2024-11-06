@@ -316,11 +316,12 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useMetricsStore } from '../stores/metrics'
 import { Monitor, Cpu, Connection, DataLine } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import config from '../config'
 
 const router = useRouter()
 const route = useRoute()
 const store = useMetricsStore()
+let ws = null
 
 // 状态
 const sortBy = ref('label')
@@ -555,26 +556,60 @@ function navigateToDetail(ip) {
   router.push(`/host-metrics/${ip}`)
 }
 
-// 生命周期钩子
-let timer
-onMounted(async () => {
-  try {
-    await store.fetchHosts()
-    if (route.query.ip) {
-      ipFilter.value = route.query.ip
+// 替换原有的轮询逻辑为WebSocket连接
+function connectWebSocket() {
+  const wsUrl = config.getDashboardWsURL()
+  ws = new WebSocket(wsUrl)
+
+  ws.onopen = () => {
+    console.log('WebSocket connected')
+    store.loading = false
+  }
+
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data)
+      store.hosts = data.hosts
+      store.loading = data.loading
+      store.error = data.error
+    } catch (error) {
+      console.error('Failed to parse WebSocket message:', error)
+      store.error = '数据解析错误'
     }
+  }
+
+  ws.onerror = (error) => {
+    console.error('WebSocket error:', error)
+    store.error = 'WebSocket连接错误'
+    store.loading = false
+  }
+
+  ws.onclose = () => {
+    console.log('WebSocket disconnected')
+    store.error = 'WebSocket连接已断开'
+    store.loading = false
     
-    timer = setInterval(async () => {
-      await store.fetchHosts()
-    }, REFRESH_INTERVAL)
-  } catch (error) {
-    ElMessage.error('加载数据失败')
+    // 尝试重新连接
+    setTimeout(() => {
+      connectWebSocket()
+    }, 3000)
+  }
+}
+
+// 生命周期钩子
+onMounted(() => {
+  store.loading = true
+  connectWebSocket()
+  
+  if (route.query.ip) {
+    ipFilter.value = route.query.ip
   }
 })
 
 onUnmounted(() => {
-  if (timer) {
-    clearInterval(timer)
+  if (ws) {
+    ws.close()
+    ws = null
   }
 })
 

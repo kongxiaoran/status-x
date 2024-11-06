@@ -29,7 +29,7 @@ type HostData struct {
 	ActuatorMetrics      map[string]interface{}
 }
 
-var dataStore = make(map[string]*HostData)
+var DataStore = make(map[string]*HostData)
 var storeLock = sync.RWMutex{}
 
 func handleHostData(w http.ResponseWriter, r *http.Request) {
@@ -48,24 +48,28 @@ func handleHostData(w http.ResponseWriter, r *http.Request) {
 
 	storeLock.Lock()
 	hostData.Timestamp = time.Now().Unix()
-	if _, exists := dataStore[hostData.IP]; exists {
-		hostData.LastOfflineAlertTime = dataStore[hostData.IP].LastOfflineAlertTime
+	if _, exists := DataStore[hostData.IP]; exists {
+		hostData.LastOfflineAlertTime = DataStore[hostData.IP].LastOfflineAlertTime
 	}
-	dataStore[hostData.IP] = &hostData
+	DataStore[hostData.IP] = &hostData
 	storeLock.Unlock()
 
+	storeLock.RLock()
 	checkAlerts(hostData) // 检查警报
+	storeLock.RUnlock()
 
 	fmt.Fprintf(w, "Data received for host: %s", hostData.IP)
 }
 
 func handleDashboard(w http.ResponseWriter, r *http.Request) {
 	storeLock.RLock()
+	hostLock.RLock() // 添加 HostManage 的读锁
+	defer hostLock.RUnlock()
 	defer storeLock.RUnlock()
 
 	var hosts []HostData
-	for _, hostData := range dataStore {
-		hostData.Label = HostManage[hostData.IP].Label
+	for _, hostData := range DataStore {
+		hostData.Label = HostManage[hostData.IP].Label // 这里访问 HostManage 需要加锁
 		hosts = append(hosts, *hostData)
 	}
 

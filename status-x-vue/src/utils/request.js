@@ -1,11 +1,9 @@
 import { ElMessage } from 'element-plus'
-
-const baseURL = "http://10.15.97.66:42800"
-// const baseURL = "http://localhost:12800"
+import config from '../config'
 
 export async function request(url, options = {}) {
   try {
-    const response = await fetch(`${baseURL}${url}`, {
+    const response = await fetch(`${config.baseURL}${url}`, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
