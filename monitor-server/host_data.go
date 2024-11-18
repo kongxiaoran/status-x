@@ -26,33 +26,62 @@ type HostData struct {
 	NetConnCount         int     `json:"net_conn_count"` // 网络连接数
 	Timestamp            int64   `json:"timestamp"`
 	LastOfflineAlertTime int64   `json:"last_offline_alert_time"` // 最新离线报警时间
+	Status               string  `json:"status"`
 	ActuatorMetrics      map[string]interface{}
 }
 
 var DataStore = make(map[string]*HostData)
 var storeLock = sync.RWMutex{}
 
+// 更新主机数据
+func updateHostData(newData *HostData) {
+	storeLock.Lock()
+	defer storeLock.Unlock()
+
+	// 获取现有数据
+	existingData, exists := DataStore[newData.IP]
+	if !exists {
+		// 如果是新主机，创建新记录
+		DataStore[newData.IP] = &HostData{
+			IP:                   newData.IP,
+			Hostname:             newData.Hostname,
+			Status:               "online",
+			LastOfflineAlertTime: 0,
+		}
+		existingData = DataStore[newData.IP]
+	}
+
+	// 只更新监控指标相关字段
+	existingData.Timestamp = newData.Timestamp
+	existingData.CPUUsage = newData.CPUUsage
+	existingData.MemoryUsage = newData.MemoryUsage
+	existingData.DiskUsage = newData.DiskUsage
+	existingData.CPUCores = newData.CPUCores
+	existingData.TotalMemory = newData.TotalMemory
+	existingData.TotalDisk = newData.TotalDisk
+	existingData.NetworkIO = newData.NetworkIO
+	existingData.ReadWriteIO = newData.ReadWriteIO
+	existingData.NetConnCount = newData.NetConnCount
+}
+
+// 处理主机数据上报
 func handleHostData(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "Only POST allowed", http.StatusMethodNotAllowed)
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	var hostData HostData
-	hostData.LastOfflineAlertTime = 0
-	err := json.NewDecoder(r.Body).Decode(&hostData)
-	if err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&hostData); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	storeLock.Lock()
+	// 设置时间戳
 	hostData.Timestamp = time.Now().Unix()
-	if _, exists := DataStore[hostData.IP]; exists {
-		hostData.LastOfflineAlertTime = DataStore[hostData.IP].LastOfflineAlertTime
-	}
-	DataStore[hostData.IP] = &hostData
-	storeLock.Unlock()
+
+	// 更新主机数据
+	updateHostData(&hostData)
 
 	storeLock.RLock()
 	checkAlerts(hostData) // 检查警报
@@ -61,16 +90,21 @@ func handleHostData(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Data received for host: %s", hostData.IP)
 }
 
+// 获取仪表盘数据
 func handleDashboard(w http.ResponseWriter, r *http.Request) {
 	storeLock.RLock()
-	hostLock.RLock() // 添加 HostManage 的读锁
-	defer hostLock.RUnlock()
+	hostLock.RLock()
 	defer storeLock.RUnlock()
+	defer hostLock.RUnlock()
 
 	var hosts []HostData
 	for _, hostData := range DataStore {
-		hostData.Label = HostManage[hostData.IP].Label // 这里访问 HostManage 需要加锁
-		hosts = append(hosts, *hostData)
+		// 复制一份数据，避免直接暴露内部数据
+		host := *hostData
+		if label, exists := HostManage[host.IP]; exists {
+			host.Label = label.Label
+		}
+		hosts = append(hosts, host)
 	}
 
 	json.NewEncoder(w).Encode(hosts)

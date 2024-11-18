@@ -1,7 +1,7 @@
 <template>
   <div class="dashboard">
     <!-- <el-page-header content="中台服务器监控" :show-back="false" /> -->
-    <h2 class="page-title">中台服务器监控</h2>
+    <h2 class="page-title">后端研发开发环境服务器监控</h2>
     
     <!-- 添加加载状态 -->
     <el-loading 
@@ -234,8 +234,8 @@
                   {{ (host.total_disk / 1024 / 1024 / 1024).toFixed(2) }} GB
                 </el-descriptions-item>
                 <el-descriptions-item label="状态">
-                  <el-tag :type="host.status !== 'online' ? 'success' : 'danger'">
-                    {{ host.status !== 'online' ? '在线' : '离线' }}
+                  <el-tag :type="host.status === 'online' ? 'success' : 'danger'">
+                    {{ host.status === 'online' ? '在线' : '离线' }}
                   </el-tag>
                 </el-descriptions-item>
               </el-descriptions>
@@ -325,7 +325,7 @@ let ws = null
 
 // 状态
 const sortBy = ref('label')
-const showDetail = ref(localStorage.getItem('detailMode') === 'true')
+const showDetail = ref(false)
 
 // 新增状态
 const selectedGroup = ref('')
@@ -348,6 +348,19 @@ watch(ipFilter, (newValue) => {
       ip: newValue || undefined
     }
   })
+})
+
+// 监听 showDetail 变化并保存到 localStorage
+watch(showDetail, (value) => {
+  localStorage.setItem('detailMode', value)
+})
+
+// 初始化时从 localStorage 读取
+onMounted(() => {
+  const savedMode = localStorage.getItem('detailMode')
+  if (savedMode !== null) {
+    showDetail.value = savedMode === 'true'
+  }
 })
 
 // 计算属性
@@ -383,7 +396,6 @@ const statistics = computed(() => {
     usedDisk: 0
   })
 
-  console.log(totals.memory)
   return {
     totalHosts: total,
     totalCpuCores: totals.cpuCores,

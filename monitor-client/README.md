@@ -42,3 +42,7 @@ sudo systemctl status status-x-client
 
 
 INFLUX_TOKEN="wh56EgkTNCyt-oSz_4Uo8l_SYy9R57CnUFy2NZY4bxmjZ9bbBNiMvQ0kdo8W4cwdvP6JrgXY49uXpTI7d5mRtA==" INFLUX_URL="10.10.18.116:8086" SERVER_URL="10.10.18.116:42800" COLLECT_FREQUENCY=2 ./status-x-client
+
+
+bash <(curl -s https://newsresource.obs.cn-north-1.myhuaweicloud.com/app/download/status-x/reinstall_status_x_client.sh)
+bash <(curl -s https://newsresource.obs.cn-north-1.myhuaweicloud.com/app/download/status-x/install_status_x_client.sh)

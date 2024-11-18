@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -30,8 +31,8 @@ var alertConfig = AlertConfig{
 }
 
 type AlertStatus struct {
-	LastAlertTime time.Time     // 最近一次发送警报的时间
-	Count         time.Duration // 超过阈值的累计时间
+	LastAlertTime time.Time  // 最近一次发送警报的时间
+	Count         *time.Time // 上次连续超过阈值的开始时间
 }
 
 var alertTimers = make(map[string]map[string]*AlertStatus) // 存储每个主机的警报状态 // 存储每个主机的 CPU 和内存定时器
@@ -76,21 +77,6 @@ func handleAlertConfig(w http.ResponseWriter, r *http.Request) {
 
 // 发送 HTTP POST 请求到接口
 func SendAlertToHttp(content string) {
-	//url := "http://222.73.12.12:8008/api/SendAppMsg"
-	//payload := map[string]interface{}{
-	//	"touser": receive,
-	//	"text": map[string]string{
-	//		"content": content,
-	//	},
-	//}
-
-	//url := "http://222.73.12.12:8008/api/SendChatMsg"
-	//payload := map[string]interface{}{
-	//	"chatid": 267,
-	//	"text": map[string]string{
-	//		"content": content,
-	//	},
-	//}
 
 	url := "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b28f4f07-bc17-4a5a-815b-89f8ca485ba2"
 
@@ -147,11 +133,28 @@ func SendAlert(hostIP string, resourceType string) {
 	if exists && currentHost.Label != "" {
 		name = name + " | " + currentHost.Label
 	}
-	owner := "all"
+	owner := "zhangqi3"
 	if exists && currentHost.Owner != "" {
 		owner = currentHost.Owner
 	}
-	alertMessage := fmt.Sprintf("[中台服务器监控](http://10.15.97.66:42800/)\n发生告警：主机 [%s](http://10.15.97.66:42800/), %s\n<@%s>", name, msg, owner)
+
+	// 处理多个owner的情况
+	owners := strings.Split(owner, ",")
+	ownerTags := make([]string, 0, len(owners))
+	for _, o := range owners {
+		if trimmed := strings.TrimSpace(o); trimmed != "" {
+			ownerTags = append(ownerTags, fmt.Sprintf("<@%s>", trimmed))
+		}
+	}
+
+	alertMessage := fmt.Sprintf(
+		"[中台服务器监控](http://10.15.97.66:42800/vue/home)\n发生告警：主机 [%s](http://10.15.97.66:42800/vue/home?ip=%s), %s\n%s",
+		name,
+		hostIP,
+		msg,
+		strings.Join(ownerTags, " "),
+	)
+
 	SendAlertToHttp(alertMessage)
 	log.Println(alertMessage)
 }
@@ -176,32 +179,40 @@ func checkAlerts(host HostData) {
 
 func checkResource(host HostData, resourceType string, threshold time.Duration) {
 	if _, exists := alertTimers[host.IP][resourceType]; !exists {
-		alertTimers[host.IP][resourceType] = &AlertStatus{LastAlertTime: time.Unix(0, 0), Count: 0}
+		alertTimers[host.IP][resourceType] = &AlertStatus{LastAlertTime: time.Unix(0, 0), Count: nil}
 	}
 
 	alertStatus := alertTimers[host.IP][resourceType]
+	nowTime := time.Now()
 
 	if threshold == 0 { // 特殊处理磁盘使用率
 		if host.DiskUsage > alertConfig.DiskThreshold {
-			if alertStatus.LastAlertTime.IsZero() || time.Since(alertStatus.LastAlertTime) >= time.Hour {
+			if alertStatus.LastAlertTime.IsZero() || time.Since(alertStatus.LastAlertTime) >= 2*time.Hour {
 				SendAlert(host.IP, "disk")
 				alertStatus.LastAlertTime = time.Now()
 			}
-		} else {
-			alertStatus.LastAlertTime = time.Unix(0, 0)
 		}
 	} else { // 处理 CPU 和内存使用率
 		if usage := getHostUsage(host, resourceType); usage > alertConfig.GetThreshold(resourceType) {
-			alertStatus.Count += 1 * time.Second
-			if alertStatus.Count >= threshold {
-				if alertStatus.LastAlertTime.IsZero() || time.Since(alertStatus.LastAlertTime) >= 30*time.Minute {
+
+			// 如果是周期内第一次超过上限，则记录 超过阈值的开始时间
+			if alertStatus.Count == nil {
+				alertStatus.Count = &nowTime
+			}
+
+			// 如果超过阈值的时间 超过限定阈值
+			if time.Since(*alertStatus.Count) >= threshold {
+				// 如果上次告警时间为空，或者 距离上次告警时间超过了30分钟,则触发告警通知
+				if time.Since(alertStatus.LastAlertTime) >= 30*time.Minute {
 					SendAlert(host.IP, resourceType)
 					alertStatus.LastAlertTime = time.Now()
-					alertStatus.Count = 0 // 重置计数器
+					// 开始 新一轮周期
+					alertStatus.Count = nil
 				}
 			}
 		} else {
-			alertStatus.Count = 0 // 重置计数器
+			// 每次没超过阈值，都会中断 持续超过阈值的时间
+			alertStatus.Count = nil // 重置 超阈值周期
 		}
 	}
 }

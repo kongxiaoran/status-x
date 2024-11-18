@@ -1,7 +1,6 @@
 <template>
   <div class="pod-metrics">
-    <el-page-header content="Pod 资源监控" />
-    
+    <h2 class="page-title">Pod 资源监控</h2>
     <div class="control-panel">
       <el-space wrap>
         <el-select v-model="sortBy" placeholder="排序方式">

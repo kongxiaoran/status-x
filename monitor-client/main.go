@@ -131,7 +131,7 @@ func sendDataToInfluxDB(data HostData) {
 
 	req, err := http.NewRequest("POST", influxDBURL, bytes.NewBuffer([]byte(influxData)))
 	if err != nil {
-		fmt.Println("Failed to create request:", err)
+		log.Println("Failed to create request:", err)
 		return
 	}
 	req.Header.Set("Authorization", "Token "+InfluxToken) // 使用 Token 进行认证
@@ -142,7 +142,7 @@ func sendDataToInfluxDB(data HostData) {
 	resp, err := client.Do(req)
 	//cost := time.Since(now).Milliseconds()
 	if err != nil {
-		fmt.Println("Error sending data to InfluxDB:", err)
+		log.Println("Error sending data to InfluxDB:", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -153,14 +153,14 @@ func sendDataToInfluxDB(data HostData) {
 func sendDataToServer(data HostData) {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		fmt.Println("Error marshaling host data:", err)
+		log.Println("Error marshaling host data:", err)
 		return
 	}
 	//now := time.Now()
 	resp, err := http.Post("http://"+ServerURL+"/api/host-data", "application/json", bytes.NewBuffer(jsonData))
 	//cost := time.Since(now).Milliseconds()
 	if err != nil {
-		fmt.Println("Error sending data to server:", err)
+		log.Println("Error sending data to server:", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -197,6 +197,7 @@ func init() {
 }
 
 func main() {
+	log.Println("status-x 探针程序开始运行")
 	IpAdress, _ = getIPv4Address()
 
 	diskReadWriteIO, _ := disk.IOCounters()
@@ -218,7 +219,7 @@ func main() {
 	for {
 		hostData, err := getHostData()
 		if err != nil {
-			fmt.Println("Error getting host data:", err)
+			log.Println("Error getting host data:", err)
 			continue
 		}
 

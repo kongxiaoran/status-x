@@ -1,6 +1,6 @@
 <template>
   <div class="alert-config">
-    <el-page-header content="警报配置" />
+    <h2 class="page-title">警报配置</h2>
     
     <el-card class="config-card">
       <el-form 

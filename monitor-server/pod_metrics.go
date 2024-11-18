@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
@@ -56,7 +55,7 @@ func getPodMetrics(clientset *kubernetes.Clientset, metricsClientset *metricscli
 				return
 			}
 			for _, pod := range pods.Items {
-				fmt.Println(pod.Namespace, "  ", pod.Name)
+				//fmt.Println(pod.Namespace, "  ", pod.Name)
 				node, err := clientset.CoreV1().Nodes().Get(context.TODO(), pod.Spec.NodeName, metav1.GetOptions{})
 				nodeIP := ""
 				if err == nil {
@@ -66,7 +65,7 @@ func getPodMetrics(clientset *kubernetes.Clientset, metricsClientset *metricscli
 				podMetrics, err := metricsClientset.MetricsV1beta1().PodMetricses(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 				if err != nil {
 					// 记录错误并返回
-					log.Printf("未能获取 Pod %s 的指标: %v", pod.Name, err)
+					//log.Printf("未能获取 Pod %s 的指标: %v", pod.Name, err)
 					// 转换内存为 MiB
 					hostData := HostData{
 						Hostname:    pod.Name,
@@ -112,6 +111,6 @@ func getPodMetrics(clientset *kubernetes.Clientset, metricsClientset *metricscli
 		}()
 	}
 	wg.Wait() // 等待所有 goroutines 完成
-	fmt.Println("pod 监测数据获取成功")
+	//fmt.Println("pod 监测数据获取成功")
 	return temp, nil
 }

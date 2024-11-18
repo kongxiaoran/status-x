@@ -58,8 +58,8 @@ func addHostInDB(host Host) error {
 
 // 增加或更新主机信息
 func updateHostInDB(host Host) error {
-	query := `UPDATE hosts SET alert_enabled = ?,owner = ?  WHERE ip_address = ?;`
-	_, err := db.Exec(query, host.AlertEnabled, host.Owner, host.IPAddress)
+	query := `UPDATE hosts SET alert_enabled = ?,label = ? ,owner = ?  WHERE ip_address = ?;`
+	_, err := db.Exec(query, host.AlertEnabled, host.Label, host.Owner, host.IPAddress)
 	if err == nil {
 		hostLock.Lock()
 		HostManage[host.IPAddress] = host

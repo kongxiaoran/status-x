@@ -1,6 +1,6 @@
 <template>
   <div class="host-manager">
-    <el-page-header content="主机管理" />
+    <h2 class="page-title">主机管理</h2>
     
     <el-card class="manager-card">
       <template #header>
@@ -51,7 +51,7 @@
         border
       >
         <el-table-column prop="ip_address" label="IP地址" width="200" />
-        <el-table-column label="主机标签" width="200">
+        <el-table-column label="主机标签" width="500">
           <template #default="{ row }">
             <div class="editable-cell">
               <el-input
@@ -68,7 +68,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="负责人" width="200">
+        <el-table-column label="负责人" width="300">
           <template #default="{ row }">
             <div class="editable-cell">
               <el-input
