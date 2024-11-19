@@ -1,0 +1,25 @@
+ /* 创建一个通用样式文件 */
+.page-container {
+    padding: 20px;
+    background: #f9fafc;
+  }
+  
+  .page-header {
+    margin-bottom: 24px;
+    font-size: 22px;
+    font-weight: 600;
+    color: #1a1a1a;
+    letter-spacing: 0.5px;
+  }
+  
+  .card-container {
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+  }
+  
+  .card-container:hover {
+    box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.08);
+  }

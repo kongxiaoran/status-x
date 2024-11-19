@@ -36,6 +36,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable status-x-client
 sudo systemctl start status-x-client
 sudo systemctl stop status-x-client
+sudo systemctl disable status-x-client
 sudo systemctl status status-x-client
 
 
