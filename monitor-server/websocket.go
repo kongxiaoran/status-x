@@ -92,10 +92,16 @@ func broadcastMetrics() {
 
 // 发送广播消息
 func sendBroadcast(message []byte) {
+	// 获取客户端列表前加锁
 	clientsMux.Lock()
-	defer clientsMux.Unlock()
-
+	clientList := make([]*websocket.Conn, 0, len(clients))
 	for client := range clients {
+		clientList = append(clientList, client)
+	}
+	clientsMux.Unlock()
+
+	log.Printf("本次广播数据的客户端数量：%d，广播数据量：%d\n", len(clientList), len(message))
+	for _, client := range clientList {
 		err := client.WriteMessage(websocket.TextMessage, message)
 		if err != nil {
 			log.Printf("Write error: %v", err)

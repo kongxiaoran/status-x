@@ -17,9 +17,9 @@ docker run -d --name mysql5.8 -p 13306:3306 -e MYSQL_ROOT_PASSWORD=11111111 -v /
 docker login -u tcdept-hf -p Tcdept@427 dockerhubbs.finchina.com
 116 服务器
 
-docker build -t status-x-server:0.0.5 .
-docker tag status-x-server:0.0.5 dockerhubbs.finchina.com/finchina-dev/status-x-server:0.0.5
-docker push dockerhubbs.finchina.com/finchina-dev/status-x-server:0.0.5
+docker build -t status-x-server:0.0.8 .
+docker tag status-x-server:0.0.8 dockerhubbs.finchina.com/finchina-dev/status-x-server:0.0.8
+docker push dockerhubbs.finchina.com/finchina-dev/status-x-server:0.0.8
 
 
 
