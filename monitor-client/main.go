@@ -224,7 +224,7 @@ func main() {
 		}
 
 		// 将数据发送到 InfluxDB
-		sendDataToInfluxDB(hostData)
+		//sendDataToInfluxDB(hostData)
 
 		// 将数据发送到服务端
 		sendDataToServer(hostData)

@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -77,6 +79,9 @@ func handleHostData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 存储数据
+	sendDataToInfluxDB(hostData)
+
 	// 设置时间戳
 	hostData.Timestamp = time.Now().Unix()
 
@@ -88,6 +93,33 @@ func handleHostData(w http.ResponseWriter, r *http.Request) {
 	storeLock.RUnlock()
 
 	fmt.Fprintf(w, "Data received for host: %s", hostData.IP)
+}
+
+// 将监控数据发送到 InfluxDB
+func sendDataToInfluxDB(data HostData) {
+	influxDBURL := "http://" + InfluxURL + "/write?db=finchina-dev"
+	influxData := fmt.Sprintf(
+		"host_metrics,host=%s cpu_usage=%.2f,memory_usage=%.2f,disk_usage=%.2f",
+		data.IP, data.CPUUsage, data.MemoryUsage, data.DiskUsage)
+
+	req, err := http.NewRequest("POST", influxDBURL, bytes.NewBuffer([]byte(influxData)))
+	if err != nil {
+		log.Println("Failed to create request:", err)
+		return
+	}
+	req.Header.Set("Authorization", "Token "+InfluxToken) // 使用 Token 进行认证
+	req.Header.Set("Content-Type", "text/plain")          // InfluxDB 2.x 使用 "text/plain" 类型
+	client := &http.Client{}
+	//增加请求延迟打印延迟
+	//now := time.Now()
+	resp, err := client.Do(req)
+	//cost := time.Since(now).Milliseconds()
+	if err != nil {
+		log.Println("Error sending data to InfluxDB:", err)
+		return
+	}
+	defer resp.Body.Close()
+	//fmt.Println("Data sent to InfluxDB, response status: ", resp.Status, " cost:", cost, "ms")
 }
 
 // 获取仪表盘数据

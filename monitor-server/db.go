@@ -12,8 +12,8 @@ import (
 
 var db *sql.DB
 
-var MYSQL_HOST = "10.15.97.43"
-var MYSQL_PORT = 3306
+var MYSQL_HOST = "10.10.17.16"
+var MYSQL_PORT = 33066
 var MYSQL_USER = "app"
 var MYSQL_PASS = "app"
 var dsn = ""
