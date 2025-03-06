@@ -38,7 +38,7 @@ func handlePodMetrics(w http.ResponseWriter, r *http.Request) {
 func getPodMetrics(clientset *kubernetes.Clientset, metricsClientset *metricsclientset.Clientset) ([]HostData, error) {
 
 	// 指定要查询的命名空间
-	namespaces := []string{"finchina-dev", "finchina-test2", "finchina-api", "finchina-userservice-dev"} // 命名空间
+	namespaces := []string{"finchina-dev", "finchina-test", "finchina-api", "finchina-userservice-dev", "finchina-userservice-test"} // 命名空间
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex // 用于保护对 temp 的访问

@@ -2,9 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/sasha-s/go-deadlock"
 	"log"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -21,7 +21,7 @@ var (
 
 	// 客户端连接管理
 	clients    = make(map[*websocket.Conn]bool)
-	clientsMux sync.Mutex
+	clientsMux deadlock.Mutex
 )
 
 // WebSocket连接处理
@@ -58,55 +58,47 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 // 广播数据给所有连接的客户端
 func broadcastMetrics() {
 	for {
-		// 获取数据时加锁
-		storeLock.RLock()
-		hostLock.RLock()
+		log.Println("准备发送广播数据")
+		// 不加锁直接读取数据
 		var hosts []HostData
 		for _, hostData := range DataStore {
-			hostData.Label = HostManage[hostData.IP].Label
-			hosts = append(hosts, *hostData)
+			hostCopy := *hostData // 创建副本
+			if label, exists := HostManage[hostCopy.IP]; exists {
+				hostCopy.Label = label.Label
+			}
+			hosts = append(hosts, hostCopy)
 		}
-		hostLock.RUnlock()
-		storeLock.RUnlock()
 
-		// 准备要发送的数据
 		data := map[string]interface{}{
 			"hosts":   hosts,
 			"loading": false,
 			"error":   nil,
 		}
 
-		// 序列化数据
 		jsonData, err := json.Marshal(data)
 		if err != nil {
 			log.Printf("JSON marshal error: %v", err)
 			continue
 		}
 
-		// 广播给所有客户端
 		sendBroadcast(jsonData)
-
-		time.Sleep(time.Second) // 每秒更新一次
+		time.Sleep(time.Second)
 	}
 }
 
 // 发送广播消息
 func sendBroadcast(message []byte) {
-	// 获取客户端列表前加锁
 	clientsMux.Lock()
-	clientList := make([]*websocket.Conn, 0, len(clients))
-	for client := range clients {
-		clientList = append(clientList, client)
-	}
-	clientsMux.Unlock()
+	defer clientsMux.Unlock()
 
-	log.Printf("本次广播数据的客户端数量：%d，广播数据量：%d\n", len(clientList), len(message))
-	for _, client := range clientList {
+	log.Printf("本次广播数据的客户端数量：%d，广播数据量：%d\n", len(clients), len(message))
+	for client := range clients {
 		err := client.WriteMessage(websocket.TextMessage, message)
 		if err != nil {
 			log.Printf("Write error: %v", err)
 			client.Close()
 			delete(clients, client)
+			continue
 		}
 	}
 }
